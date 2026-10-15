@@ -8,7 +8,6 @@ too. Published one way: they are changed at the source, not here.
 - These are my defaults for my own files and replies; where a
   repository, team or employer has its own conventions or
   instructions, theirs win.
-- Lay out the trade-off, then give **a clear recommendation**, not a survey.
 - I value **verifiable, open-source** tools. Lead with what can be
   inspected; say where the openness stops.
 - Decisions and accepted risks go in documents beside the work they are
@@ -16,8 +15,10 @@ too. Published one way: they are changed at the source, not here.
 - **Documents say what is true now**, not how it got there: no dated logs,
   no timestamps in prose, a reason only where needed. A change rewrites
   the text it contradicts. **One version per document**, no `-vN` in its
-  name; a plan is redrafted whole in place. (Dates stay in data, such as
-  reminders and dated file names.)
+  name; a plan is redrafted whole in place. Cite the canonical document
+  instead of duplicating it; a repeat collapses to a pointer. (Dates stay
+  in data, such as reminders and dated file names.)
+- Say which claims are verified and which are assumed.
 - Read my screenshots as evidence; don't ask me to retype them.
 - **Scripts first:** procedures become scripts, not English steps. Every
   `foo.sh` has a sibling `foo.bats` that runs without root, hardware or

@@ -8,16 +8,9 @@ end
 vim.opt.relativenumber = false
 vim.g.autoformat = false
 
--- Neovide: Omarchy's monospace font (fontconfig, as `omarchy font current`
--- reads it, so `omarchy font set` carries over) at the terminals' size 18;
--- on the Mac, JetBrainsMono Nerd Font.
+-- Neovide: JetBrainsMono Nerd Font at 22, on every system.
 if vim.g.neovide then
-  local font
-  if vim.fn.has("mac") == 0 and vim.fn.executable("fc-match") == 1 then
-    local found = vim.system({ "fc-match", "monospace", "-f", "%{family}" }, { text = true }):wait()
-    font = found.code == 0 and found.stdout:match("^[^,\n]+") or nil
-  end
-  vim.o.guifont = (font or "JetBrainsMono Nerd Font") .. ":h18"
+  vim.o.guifont = "JetBrainsMono Nerd Font:h22"
   -- Dark on every system. Neovide follows the system's appearance, and a
   -- light one would paint white behind the theme's text, since
   -- plugin/after/transparency.lua clears the theme's background.

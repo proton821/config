@@ -3,7 +3,10 @@
 The look and feel of one machine, published for another (a Mac) to take:
 Neovim (LazyVim, with Neovide's settings), herdr, one colour theme for
 Neovim, Ghostty and Claude Code (herdr follows Ghostty's colours), and the
-rules for Claude Code that hold on both machines (`claude-rules.md`).
+rules for Claude Code that hold on both machines (`claude-rules.md`), and
+`bin/pending.sh`, which keeps a `pending.txt` queue of commands to run by
+hand (its header is the layout; bash 5, Homebrew's: `bash
+bin/pending.sh`; tests: `bats bin/pending.bats`).
 
 It goes one way. Changes are made at the source and arrive here; nothing
 is edited in this repo, and `install.sh update` discards any change made in
@@ -30,10 +33,11 @@ where that is set). Anything already there is moved aside to
 `NAME.before-config` (`.2` and on, if that is taken), and with an earlier
 Neovim config go its plugins (`~/.local/share/nvim/lazy`). It puts one line
 in `~/.config/ghostty/config.ghostty` including `.config/ghostty/mac` (the
-theme, the left Option key as Alt, and Alt+Left and Alt+Right left to
-herdr), Claude Code's `theme` in `~/.claude/settings.json`, and one line
-importing `claude-rules.md` in `~/.claude/CLAUDE.md`, leaving the rest of
-each file alone; `status` reports any Ghostty config whose colours, or
+theme, JetBrainsMono Nerd Font Mono at 22, the left Option key as Alt,
+and Alt+Left and Alt+Right left to herdr), Claude Code's `theme` in
+`~/.claude/settings.json`, and one line importing `claude-rules.md` in
+`~/x/CLAUDE.md` (`~/.claude/CLAUDE.md` off macOS; `CLAUDE_MD` names
+another), leaving the rest of each file alone; `status` reports any Ghostty config whose colours, or
 included theme, win over it.
 
 Needs git, jq (macOS 15 has it), Neovide, Ghostty, herdr and

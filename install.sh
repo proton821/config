@@ -31,8 +31,10 @@ CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 LAZY=${XDG_DATA_HOME:-$HOME/.local/share}/nvim/lazy
 CLAUDE_SETTINGS=${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}
 # The shared rules are imported by one line of Claude Code's own CLAUDE.md;
-# the rest of that file is the Mac's. A space in the path is escaped.
-CLAUDE_MD=${CLAUDE_MD:-$HOME/.claude/CLAUDE.md}
+# the rest of that file is the Mac's. A space in the path is escaped. On
+# macOS it is ~/x/CLAUDE.md; CLAUDE_MD names another.
+if [ "$(uname -s)" = Darwin ]; then CLAUDE_MD=${CLAUDE_MD:-$HOME/x/CLAUDE.md}
+else CLAUDE_MD=${CLAUDE_MD:-$HOME/.claude/CLAUDE.md}; fi
 RULES_LINE=@$(printf '%s' "$REPO/claude-rules.md" | sed 's/ /\\ /g')
 # Ghostty reads its legacy config, then config.ghostty, then the same two in
 # Application Support, later ones winning, and the files their config-file
@@ -227,7 +229,7 @@ ghostty() {
       fi
       printf '%s\n' "$GHOSTTY_LINE"; } >"$GHOSTTY_CONFIG.new"
     write_over "$GHOSTTY_CONFIG"
-    ok "Ghostty's settings: theme $GHOSTTY_THEME, left Option as Alt, herdr's tab keys (reload Ghostty's config to see them)"
+    ok "Ghostty's settings: theme $GHOSTTY_THEME, JetBrainsMono Nerd Font Mono at 22, left Option as Alt, herdr's tab keys (reload Ghostty's config to see them)"
   fi
   over=$(ghostty_overridden)
   if [ -n "$over" ]; then

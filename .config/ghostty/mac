@@ -1,6 +1,11 @@
 # Ghostty on the Mac, from this repo: install.sh includes this file from
 # config.ghostty, and Ghostty reads it after its own config files.
 theme = omarchy
+# JetBrains Mono Nerd Font, its Mono variant (every glyph one cell wide), at
+# 22, drawn heavier.
+font-family = JetBrainsMono Nerd Font Mono
+font-size = 22
+font-thicken = true
 # The left Option key is Alt, for herdr's alt keys; the right one still
 # types characters such as # on a British layout.
 macos-option-as-alt = left
