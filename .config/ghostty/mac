@@ -1,0 +1,9 @@
+# Ghostty on the Mac, from this repo: install.sh includes this file from
+# config.ghostty, and Ghostty reads it after its own config files.
+theme = omarchy
+# The left Option key is Alt, for herdr's alt keys; the right one still
+# types characters such as # on a British layout.
+macos-option-as-alt = left
+# herdr's tab keys, not Ghostty's word moves.
+keybind = alt+left=unbind
+keybind = alt+right=unbind
