@@ -1,5 +1,4 @@
-# pending-hook.zsh - zsh's pending-hook.sh, for the work Mac (and tested on
-# the rig): when you run a command queued in ~/pending.txt, exactly as
+# pending-hook.zsh - when you run a command from pending.txt, exactly as
 # written there, it runs through `pending.sh run` instead: the same command,
 # its output on screen and kept for Claude in ~/.local/state/pending/, the
 # job marked "ran ...: ok" or "failed (exit N)", and a failure ending with
@@ -13,11 +12,10 @@
 # command's. Only a job's command line is copied, never its notes, so a
 # line of several is never a job's.
 #
-# pending.sh, never pending.bin, until the queue's rewrite for the work Mac
-# is done. It runs through the bash on PATH (Homebrew's on the Mac), since
+# pending.sh runs through the bash on PATH (Homebrew's on the Mac), since
 # the Mac's clone keeps no x bit. Not for scripts: only interactive shells,
-# and only if pending.sh is there. zsh, not bash, so ShellCheck can't read
-# it. On the Mac, one line install.sh puts in ~/.zshrc loads it. Tests:
+# and only if pending.sh is beside it. zsh, not bash, so ShellCheck can't
+# read it. One line install.sh puts in ~/.zshrc loads it. Tests:
 # pending-hook.bats.
 
 [[ -o interactive ]] || return 0
@@ -25,15 +23,16 @@
 typeset -g __pending_cmd=${${(%):-%x}:A:h}/pending.sh
 [[ -r $__pending_cmd ]] || return 0
 typeset -g __pending_line=
-# The queue, as pending.sh finds it (~/x/pending.txt on the Mac), read
-# here: inside a widget $PENDING is zle's own (how many keys wait).
+# pending.txt, where pending.sh finds it (~/x/pending.txt on the Mac,
+# ~/pending.txt on the rig), read here: inside a widget $PENDING is zle's
+# own (how many keys wait).
 if [[ $OSTYPE == darwin* ]]; then
   typeset -g __pending_file=${PENDING:-$HOME/x/pending.txt}
 else
   typeset -g __pending_file=${PENDING:-$HOME/pending.txt}
 fi
 
-# __pending_finish: the line-finish hook; turns a queued command's line
+# __pending_finish: the line-finish hook; turns a job's command line
 # into a pending-run of it.
 __pending_finish() {
   local line=$BUFFER
@@ -54,12 +53,13 @@ __pending_history() {
 }
 
 # pending-run LINE: LINE through `pending.sh run`; returns as LINE did. A
-# line no longer queued (removed in between) runs nothing: run it again.
+# line no longer in pending.txt (removed in between) runs nothing: run it
+# again.
 pending-run() {
   local rc=0
   PENDING=$__pending_file command bash -- "$__pending_cmd" run "$1" || rc=$?
   if (( rc == 100 )); then
-    print -u2 -- "pending: no longer queued, nothing ran; run it again"
+    print -u2 -- "pending: no longer in pending.txt, nothing ran; run it again"
   fi
   return $rc
 }

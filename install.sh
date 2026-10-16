@@ -32,7 +32,7 @@ LAZY=${XDG_DATA_HOME:-$HOME/.local/share}/nvim/lazy
 CLAUDE_SETTINGS=${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}
 # The shared rules are imported by one line of Claude Code's own CLAUDE.md;
 # the rest of that file is the Mac's. A space in the path is escaped. On
-# macOS it is ~/x/CLAUDE.md; CLAUDE_MD names another.
+# macOS it is ~/x/CLAUDE.md (~/.claude/CLAUDE.md where the tests run).
 if [ "$(uname -s)" = Darwin ]; then CLAUDE_MD=${CLAUDE_MD:-$HOME/x/CLAUDE.md}
 else CLAUDE_MD=${CLAUDE_MD:-$HOME/.claude/CLAUDE.md}; fi
 RULES_LINE=@$(printf '%s' "$REPO/claude-rules.md" | sed 's/ /\\ /g')
@@ -48,11 +48,13 @@ GHOSTTY_LINE="config-file = ?\"$REPO/$GHOSTTY_MAC\""
 GHOSTTY_CONFIG=$CONFIG_HOME/ghostty/config.ghostty
 GHOSTTY_BEFORE=$CONFIG_HOME/ghostty/config
 GHOSTTY_SUPPORT="$HOME/Library/Application Support/com.mitchellh.ghostty"
-# The queue's zsh hook is loaded by one line at the end of the Mac's
+# pending.txt's zsh hook is loaded by one line at the end of the Mac's
 # ~/.zshrc (in ZDOTDIR, if that is set), marked as this script's so an
 # older clone's line is replaced; it does nothing once the clone has gone.
 ZSHRC=${ZSHRC:-${ZDOTDIR:-$HOME}/.zshrc}
-ZSHRC_MARK="# the queue's hook, from config's install.sh"
+ZSHRC_MARK="# pending.txt's hook, from config's install.sh"
+# The mark of the first release's line, still taken as this script's.
+ZSHRC_MARK_OLD="# the queue's hook, from config's install.sh"
 HOOK_PATH=$(printf '%s' "$REPO/bin/pending-hook.zsh" | sed "s/'/'\\\\''/g")
 ZSHRC_LINE="[[ -r '$HOOK_PATH' ]] && source '$HOOK_PATH'  $ZSHRC_MARK"
 GHOSTTY_COLOURS='background|foreground|palette|cursor-color|cursor-text|selection-background|selection-foreground'
@@ -174,17 +176,17 @@ zshrc_ok() { [ -f "$ZSHRC" ] && grep -qxF "$ZSHRC_LINE" "$ZSHRC"; }
 
 zshrc() {
   local line
-  if zshrc_ok; then ok "the queue's zsh hook"; return; fi
+  if zshrc_ok; then ok "pending.txt's zsh hook"; return; fi
   mkdir -p "$(dirname "$ZSHRC")"
   # Only the hook's line changes (an older clone's goes).
   { if [ -f "$ZSHRC" ]; then
       while IFS= read -r line || [ -n "$line" ]; do
-        case $line in *"$ZSHRC_MARK") ;; *) printf '%s\n' "$line" ;; esac
+        case $line in *"$ZSHRC_MARK"|*"$ZSHRC_MARK_OLD") ;; *) printf '%s\n' "$line" ;; esac
       done <"$ZSHRC"
     fi
     printf '%s\n' "$ZSHRC_LINE"; } >"$ZSHRC.new"
   write_over "$ZSHRC"
-  ok "the queue's zsh hook: loaded by $ZSHRC (new shells)"
+  ok "pending.txt's zsh hook: loaded by $ZSHRC (new shells)"
 }
 
 # ghostty_ok: config.ghostty includes this repo's Mac settings.
@@ -347,8 +349,8 @@ $(links)
 EOF
   if ghostty_ok && [ -z "$(ghostty_overridden)" ]; then ok "Ghostty's settings"
   else todo "Ghostty's settings are not included, or another config overrides them (bash install.sh)"; fi
-  if zshrc_ok; then ok "the queue's zsh hook"
-  else todo "the queue's zsh hook isn't loaded by $ZSHRC (bash install.sh)"; fi
+  if zshrc_ok; then ok "pending.txt's zsh hook"
+  else todo "pending.txt's zsh hook isn't loaded by $ZSHRC (bash install.sh)"; fi
   if ! command -v jq >/dev/null 2>&1; then todo "no jq, so Claude Code's theme can't be checked"
   elif theme_ok; then ok "Claude Code's theme"
   else todo "Claude Code's theme is not set (bash install.sh)"; fi

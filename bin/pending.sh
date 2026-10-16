@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# pending.sh - the one way the queue is changed, by Claude and by timers
-# alike: ~/pending.txt, or ~/x/pending.txt on macOS (PENDING names another).
-# The layout below is the spec (Claude's instructions, "Commands I run
-# myself", say what goes in the queue and point here for how it looks):
+# pending.sh - the one way pending.txt is changed, by Claude and by timers
+# alike (where it is: PENDING, below). The layout below is the spec
+# (Claude's instructions, "Commands I run myself", say what goes in
+# pending.txt and point here for how it looks):
 #
 #   # <epoch> <type>: <what it does, to jog the memory>
 #   #  <a note: a password to look up, what to do if it stops>
@@ -35,18 +35,10 @@
 #   * the epoch is the plain integer (seconds since the epoch), nothing
 #     around it;
 #   * the type is what the user has to type or do, as short as it can be:
-#     "run" (a command, no password), "sudo", "sudo + PIN", "other
-#     password", "block" (a command Claude's sandbox blocked), "boot" (a
-#     reboot), "hand" (a step in an app), "live" (a running job's status
-#     command), "message" (text to post); its first letter lower case; its words are
-#     single-spaced, none is only digits and none has a ":", so the type
-#     ends at the first ": ";
-#   * an older, longer type is shortened wherever it is read or added: a
-#     trailing "(...)" goes, "rig password" is "sudo", " and " is " + ",
-#     and "no password", "reboot", "by hand" and "running" are "run",
-#     "boot", "hand" and "live" ("Rig password (sudo)" is "sudo", "Rig
-#     password and PIN" is "sudo + PIN", "No password (auto mode blocks
-#     Claude)" is "run");
+#     "run" (a command), "block" (a command Claude's sandbox blocked),
+#     "hand" (a step in an app), "message" (text to post);
+#     its first letter lower case; its words are single-spaced, none is
+#     only digits and none has a ":", so the type ends at the first ": ";
 #   * one blank line between jobs; nothing else in the file, and 0 bytes when
 #     nothing waits;
 #   * jobs newest first by their epoch (ties keep their order: numbered
@@ -59,14 +51,8 @@
 #     or starts with WHAT and the ". " (or space) after it.
 #
 # Every change re-reads the file and rewrites it whole, atomically. A file
-# it can't read is left alone, with the job it stopped at named. A job in
-# an older layout is read and written back in this one: v3's head
-# "# type epoch what", v2's "# type `date -d @epoch` what", or v1's
-# "#= type", "#@ ISO time · session · from", "#> what". Lines already
-# wider than 72 are read and kept as they are.
-#
-# Where a Rust port sits beside it (pending.rust/, pending.bin), this script
-# and pending.bats are its spec: change them first, then the Rust.
+# it can't read is left alone, with the job it stopped at named. Lines
+# already wider than 72 are read and kept as they are.
 #
 # Runs on Linux and macOS: bash 5 (Homebrew's on macOS, whose own is 3.2),
 # and GNU or BSD date, stat and chmod.
@@ -87,13 +73,12 @@
 #                                           how Claude ends a reply
 #   pending.sh match LINE                   the job whose command LINE is:
 #                                           "EPOCH<TAB>WHAT"; exit 1 if none
-#                                           (or LINE shows a secret)
 #   pending.sh ran WHAT EXIT                mark the job: a first note
 #                                           "#  ran DAY D MON, TIME: ok" (or
 #                                           "failed (exit N)"), replacing the
 #                                           last one
-#   pending.sh run LINE                     what pending-hook.sh runs when the
-#                                           user runs a queued command: LINE
+#   pending.sh run LINE                     what the shell's hook runs when
+#                                           the user runs a job's command: LINE
 #                                           in bash, its output on screen and
 #                                           kept in LOGS/EPOCH-what.log (tee),
 #                                           then `ran`, and on a failure
@@ -103,22 +88,23 @@
 #                                           LINE is no job's
 #
 # A job's log is for Claude to read (the user runs, Claude checks); `remove`
-# deletes it with the job. A line that prints a secret (`secret.sh show`) is
-# never run here, so its output is never kept. The input stays the terminal
+# deletes it with the job.
+# The input stays the terminal
 # (a password prompt reads it as before, and lines pasted after the command
 # wait for the shell); the output goes through tee, so a program sees a pipe,
 # not a terminal, and may print without colour.
 set -euo pipefail
 (( BASH_VERSINFO[0] >= 5 )) || { printf 'pending: needs bash 5 or later, not %s\n' "$BASH_VERSION" >&2; exit 1; }
 
-# The queue: ~/x/pending.txt on the work Mac, ~/pending.txt elsewhere.
+# Where pending.txt is: ~/x/pending.txt on the Mac, ~/pending.txt on the rig.
 if [[ $(uname -s) == Darwin ]]; then MAC=1; else MAC=0; fi
 if (( MAC )); then PENDING=${PENDING:-$HOME/x/pending.txt}; else PENDING=${PENDING:-$HOME/pending.txt}; fi
+# (PENDING is set only by the tests.)
 NOW=${NOW:-$(date +%s)}
 LOGS=${LOGS:-$HOME/.local/state/pending}
 NOT_A_JOB=100
 # run's command: LINE ($1) in bash, its output both on screen and added to the
-# log ($2); exits as LINE did. pending.bin runs the same text.
+# log ($2); exits as LINE did.
 # shellcheck disable=SC2016 # expanded by the bash it is given to, not here
 RUNNER='bash -c "$1" 2>&1 | tee -a "$2"; exit "${PIPESTATUS[0]}"'
 
@@ -134,11 +120,6 @@ die() { printf 'pending: %s\n' "$*" >&2; exit 1; }
 TYPE_WORD='[^[:space:]:]*[^0-9[:space:]:][^[:space:]:]*'
 TYPE_RE="^$TYPE_WORD( $TYPE_WORD)*\$"
 HEAD_RE="^# ([0-9]+) ($TYPE_WORD( $TYPE_WORD)*): (.+)\$"
-# v3's head: the type first (its words could hold a colon), then the epoch.
-V3_WORD='[^[:space:]]*[^0-9[:space:]][^[:space:]]*'
-V3_HEAD_RE="^# ($V3_WORD( $V3_WORD)*) ([0-9]+) (.+)\$"
-# shellcheck disable=SC2016  # the backticks are literal text in a v2 head, not a command
-V2_HEAD_RE='^# ([^`[:space:]][^`]*) `date -d @([0-9]+)` (.+)$'
 
 # Below this line, the by-hand jobs, as prose; the file's width. A message
 # job's lines are text to post.
@@ -147,40 +128,18 @@ MESSAGE=message
 WIDTH=72
 SEP=$(printf '%.0s-' $(seq "$WIDTH"))
 
-# The queue in memory: one entry per job, in file order.
+# pending.txt in memory: one entry per job, in file order.
 J_TYPE=() J_EPOCH=() J_WHAT=() J_BODY=() ORDER=()
 
-# short TYPE: TYPE as the queue writes it: first letter lower case, no
-# trailing "(...)", "rig password" as "sudo", " and " as " + ".
+# short TYPE: TYPE as pending.txt has it: first letter lower case, no
+# trailing "(...)", " and " as " + ".
 short() {
   local t=${1,}
   [[ $t =~ ^(.*[^[:space:]])\ \([^()]*\)$ ]] && t=${BASH_REMATCH[1]}
-  [[ $t == "rig password" || $t == "rig password "* ]] && t=sudo${t#rig password}
   t=${t// and / + }
-  case $t in
-    "no password") t=run ;;
-    reboot) t=boot ;;
-    "by hand") t=$HAND ;;
-    running) t=live ;;
-  esac
   printf '%s' "$t"
 }
 
-# v1_epoch STAMP: a v1 "#@" time (with its offset, or Z; a bare date is
-# midnight UTC) as seconds since the epoch; 0 if it isn't such a time.
-v1_epoch() {
-  local s
-  [[ $1 =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}([+-][0-9]{2}:[0-9]{2}|Z))?$ ]] || { echo 0; return; }
-  if [[ $1 == *T* ]]; then s=$1; else s="$1T00:00:00Z"; fi
-  if (( GNU_DATE )); then date -d "$s" +%s 2>/dev/null || echo 0; return; fi
-  # BSD: the time as UTC, then its offset taken off.
-  local secs off=${s:19}
-  secs=$(date -j -u -f '%Y-%m-%dT%H:%M:%S' "${s:0:19}" +%s 2>/dev/null) || { echo 0; return; }
-  if [[ $off =~ ^([+-])([0-9]{2}):([0-9]{2})$ ]]; then
-    secs=$((secs - ${BASH_REMATCH[1]}1 * (10#${BASH_REMATCH[2]} * 3600 + 10#${BASH_REMATCH[3]} * 60)))
-  fi
-  echo "$secs"
-}
 
 # words TEXT: TEXT's words, one space between them.
 words() {
@@ -219,19 +178,14 @@ push() {
 
 # load: the file into J_*; dies (nothing written) on a job it can't read.
 load() {
-  local line n=0 lineno=0 at=0 type="" epoch="" what="" body="" v1=0 stamp="" below=0 msg=0 g
+  local line n=0 lineno=0 type="" epoch="" what="" body="" below=0 msg=0 g
   local -a gap=()
   J_TYPE=() J_EPOCH=() J_WHAT=() J_BODY=()
   [[ -f $PENDING ]] || return 0
   finish() {
     (( n )) || return 0
-    if (( v1 )); then
-      [[ -n $stamp && -n $what ]] || die "$PENDING: the job at line $at has no #=, #@ or #> line; nothing changed"
-      [[ $stamp == *' · '*' · '* ]] || die "$PENDING: line $((at + 1)): '#@' is TIME · SESSION · FROM; nothing changed"
-      epoch=$(v1_epoch "${stamp%%' · '*}")
-    fi
     push "$type" "$epoch" "$what" "$body"
-    n=0 v1=0 type="" epoch="" what="" body="" stamp="" msg=0 gap=()
+    n=0 type="" epoch="" what="" body="" msg=0 gap=()
   }
   while IFS= read -r line || [[ -n $line ]]; do
     lineno=$((lineno + 1))
@@ -249,7 +203,7 @@ load() {
     fi
     if [[ -z ${line//[[:space:]]/} ]]; then finish; continue; fi
     if [[ $line =~ ^-{3,}$ ]]; then finish; below=1; continue; fi
-    (( n++ )) || at=$lineno
+    n=$((n + 1))
     if (( below )); then
       type=$HAND epoch=0 what+=${what:+ }$line
       continue
@@ -257,25 +211,11 @@ load() {
     if (( n == 1 )); then
       if [[ $line =~ $HEAD_RE ]]; then
         epoch=$((10#${BASH_REMATCH[1]})) type=${BASH_REMATCH[2]} what=${BASH_REMATCH[4]}
-      elif [[ $line =~ $V2_HEAD_RE ]]; then
-        type=${BASH_REMATCH[1]} epoch=$((10#${BASH_REMATCH[2]})) what=${BASH_REMATCH[3]}
-      elif [[ $line =~ $V3_HEAD_RE ]]; then
-        type=${BASH_REMATCH[1]} epoch=$((10#${BASH_REMATCH[3]})) what=${BASH_REMATCH[4]}
-      elif [[ $line == "#= "* ]]; then
-        v1=1 type=${line:3}
       else
         die "$PENDING: line $lineno: a job starts '# EPOCH TYPE: WHAT'; nothing changed"
       fi
       [[ $(short "$type") != "$MESSAGE" ]] || msg=1
       continue
-    fi
-    if (( v1 && n == 2 )); then
-      [[ $line == "#@ "* ]] || die "$PENDING: line $lineno: '#@' is a v1 job's second line; nothing changed"
-      stamp=${line:3}; continue
-    fi
-    if (( v1 && n == 3 )); then
-      [[ $line == "#> "* ]] || die "$PENDING: line $lineno: '#>' is a v1 job's third line; nothing changed"
-      what=${line:3}; continue
     fi
     body+=${body:+$'\n'}$line
   done <"$PENDING"
@@ -344,7 +284,7 @@ render() {
   below "${hand[@]}"
 }
 
-# save: render into a temp file beside the queue, then replace it (only if
+# save: render into a temp file beside pending.txt, then replace it (only if
 # it differs).
 save() {
   local tmp
@@ -379,14 +319,14 @@ body_of() {
 
 # message_of LINE...: a message's text: the LINEs as given (stdin's text
 # with none), without blank lines at either end; dies on an empty one, or
-# one holding a line the queue would read as a job's head or the line.
+# one holding a line pending.txt would read as a job's head or the line.
 message_of() {
   local text line
   if (( $# )); then text=$(printf '%s\n' "$@"); else text=$(cat); fi
   text=$(printf '%s\n' "$text" | awk 'NF { n = NR } { l[NR] = $0 } END { for (i = 1; i <= n; i++) if (s || l[i] ~ /[^[:space:]]/) { s = 1; print l[i] } }')
   [[ -n $text ]] || die "a message can't be empty"
   while IFS= read -r line; do
-    [[ $line != "$SEP" && ! $line =~ $HEAD_RE ]] || die "a message's line would end it in the queue: $line"
+    [[ $line != "$SEP" && ! $line =~ $HEAD_RE ]] || die "a message's line would end it in pending.txt: $line"
   done <<<"$text"
   printf '%s' "$text"
 }
@@ -498,7 +438,7 @@ wanted() {
 
 # show [WHAT...]: the head lines in ORDER, every job's or only those saying
 # one of the WHATs, then the line and the by-hand prose as the file has it;
-# nothing for a missing queue.
+# nothing for a missing pending.txt.
 cmd_show() {
   local i
   local -a hand=()
@@ -528,7 +468,6 @@ runs() {
 find_line() {
   local i
   FOUND=""
-  [[ $1 != *secret.sh\ show* ]] || return 1
   [[ -f $PENDING ]] || return 1
   load
   ordered

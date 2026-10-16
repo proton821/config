@@ -45,14 +45,11 @@ too. Published one way: they are changed at the source, not here.
 
 **Anything that prompts can't run from a tool call:** logins,
 passphrases, confirmations. Assume I can't type a password unless I say
-so. Don't run or wait on these: queue them.
+so. Don't run or wait on these: put them in pending.txt.
 
-**The queue is one file, changed only with `pending.sh`** (`add TYPE WHAT
-LINE...`, `remove [--prefix] WHAT`, `has`, `tidy`, `show [WHAT...]`; its
-header is the layout spec): `~/pending.txt` on the rig
-(`~/scripts/bin/pending.sh`), `~/x/pending.txt` on the Mac (`bash
-~/x/vendor/config/bin/pending.sh`). Never `pending.bin` until the queue
-is settled on the Mac. A job is known by its WHAT.
+**`~/x/pending.txt` is changed only with `bash ~/x/vendor/config/bin/pending.sh`** (`add
+TYPE WHAT LINE...`, `remove [--prefix] WHAT`, `has`, `tidy`, `show
+[WHAT...]`; its header is the layout spec). A job is known by its WHAT.
 
 - Only a command I can run **right now**; later steps stay in the work's
   own README.
@@ -74,9 +71,8 @@ is settled on the Mac. A job is known by its WHAT.
   gets a first note `#  ran ...: ok` or `failed (exit N)` (the shell's
   hook), output in `~/.local/state/pending/`: check both at session start
   and when its topic comes up.
-- Queue the blocked step, finish the rest, say what's left.
+- Put the blocked step in pending.txt, finish the rest, say what's left.
 - **Never put a command in the reply**, nor prefix one with `!`. End with
-  "Waiting in `~/pending.txt`:" (`~/x/pending.txt` on the Mac) and a code
-  block of the head lines of the jobs **tied to that reply's topic**,
+  "Waiting in `~/x/pending.txt`:" and a code block of the head lines of the jobs **tied to that reply's topic**,
   exactly as `pending.sh show WHAT...` prints them; no other session's or
   topic's.

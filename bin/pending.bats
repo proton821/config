@@ -1,8 +1,6 @@
 #!/usr/bin/env bats
 # shellcheck disable=SC2016,SC2088  # backticks and tildes are literal text in pending.txt, as the user reads it
-# Tests for pending.sh, the spec. Run:  bats ~/scripts/bin/pending.bats
-# IMPL=rust runs the same tests against pending.bin, the Rust implementation
-# (RUST_BIN names another binary); ~/scripts/rust/rust.sh does both.
+# Tests for pending.sh, the spec. Run:  bats pending.bats (beside it)
 # A pending.txt in a temp dir and a fixed NOW; no root, no network.
 bats_require_minimum_version 1.5.0
 
@@ -15,7 +13,6 @@ setup() {
             chmod +x "$BATS_TEST_TMPDIR/pending.sh"
             SCRIPT=$BATS_TEST_TMPDIR/pending.sh
           fi ;;
-    rust) SCRIPT=${RUST_BIN:-$BATS_TEST_DIRNAME/pending.bin} ;;
     *)    echo "IMPL is sh or rust" >&2; return 1 ;;
   esac
   export PENDING=$BATS_TEST_TMPDIR/pending.txt
@@ -47,23 +44,12 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   grep -qx '# 1790000000 sudo + PIN: x' "$PENDING"
 }
 
-@test "an older, longer type is shortened when added and when read" {
-  add 1790000000 "No password (auto mode blocks Claude)" "a" "c"
-  add 1790000000 "Sudo" "b" "c"
-  add 1790000000 "Rig password and PIN" "c" "c"
-  add 1790000000 "Other password (x.sh login)" "d" "c"
-  [ "$(sed -n '/^# /p' "$PENDING")" = "$(printf '%s\n' '# 1790000000 run: a' '# 1790000000 sudo: b' \
-    '# 1790000000 sudo + PIN: c' '# 1790000000 other password: d')" ]
-  printf '%s\n' '# rig password (sudo) 1790000100 e' 'sudo c' '' '# rig password (sudo) `date -d @1790000000` f' 'sudo d' >"$PENDING"
-  "$SCRIPT" tidy
-  [ "$(sed -n '/^# /p' "$PENDING")" = "$(printf '%s\n' '# 1790000100 sudo: e' '# 1790000000 sudo: f')" ]
-}
 
 @test "order: newest first by epoch, whatever the type; by-hand jobs below the line" {
-  add 1790000100 "Running" "a job" "job.sh status x"
+  add 1790000100 live "a job" "job.sh status x"
   add 1790000300 "Sudo" "newest" "sudo d"
-  add 1790000000 "No password" "oldest" "c"
-  add 1790000200 "By hand" "middle" "# b"
+  add 1790000000 run "oldest" "c"
+  add 1790000200 hand "middle" "# b"
   [ "$(whats)" = "$(printf '%s\n' newest "a job" oldest)" ]
   [ "$(prose)" = "middle. b" ]
   # one blank line between jobs and either side of the line, none at either end
@@ -79,10 +65,10 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "the same job queued again keeps the time it was first queued" {
-  add 1790000000 "No password" "cheat sheet" "show.sh"
-  add 1790000500 "No password" "other" "x"
-  add 1790000900 "no password" "cheat sheet" "show.sh"
-  add 1790000950 "No password" "cheat sheet" "# a note" "show.sh"
+  add 1790000000 run "cheat sheet" "show.sh"
+  add 1790000500 run "other" "x"
+  add 1790000900 run "cheat sheet" "show.sh"
+  add 1790000950 run "cheat sheet" "# a note" "show.sh"
   [ "$(grep -c 'cheat sheet' "$PENDING")" -eq 2 ]
   grep -qx '# 1790000000 run: cheat sheet' "$PENDING"
   run ! grep -q '1790000900' "$PENDING"
@@ -93,17 +79,17 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "with no NOW, a re-added job keeps its first real time" {
-  "$SCRIPT" add "No password" "w" "x"
+  "$SCRIPT" add run "w" "x"
   first=$(cat "$PENDING")
   sleep 1.1
-  "$SCRIPT" add "No password" "w" "x"
+  "$SCRIPT" add run "w" "x"
   [ "$(cat "$PENDING")" = "$first" ]
 }
 
-@test "remove: the jobs saying WHAT, or starting with it; empty queue is 0 bytes" {
-  add 1790000000 "Reboot" "scan: one" "a"
-  add 1790000100 "Reboot" "scan: two" "b"
-  add 1790000200 "Reboot" "scan" "c"
+@test "remove: the jobs saying WHAT, or starting with it; an empty pending.txt is 0 bytes" {
+  add 1790000000 boot "scan: one" "a"
+  add 1790000100 boot "scan: two" "b"
+  add 1790000200 boot "scan" "c"
   "$SCRIPT" remove "scan: one"
   [ "$(whats)" = "$(printf '%s\n' scan "scan: two")" ]
   "$SCRIPT" remove --prefix "scan: "
@@ -113,7 +99,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   [ ! -s "$PENDING" ]
 }
 
-@test "remove and tidy on a missing queue create nothing" {
+@test "remove and tidy on a missing pending.txt create nothing" {
   rm "$PENDING"
   "$SCRIPT" remove s
   "$SCRIPT" tidy
@@ -121,7 +107,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "has: by what, or its start" {
-  add 1790000000 "Reboot" "scan found 2" "a"
+  add 1790000000 boot "scan found 2" "a"
   "$SCRIPT" has "scan found 2"
   "$SCRIPT" has --prefix "scan found"
   run "$SCRIPT" has "scan found"
@@ -134,59 +120,40 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "tidy leaves a file already in order byte for byte, and orders one that isn't" {
-  add 1790000000 "By hand" "old" "# a"
-  add 1790000200 "Reboot" "new" "b"
+  add 1790000000 hand "old" "# a"
+  add 1790000200 boot "new" "b"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   "$SCRIPT" tidy
   cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
-  printf '# 1790000000 boot: x\nc\n\n\n# 1790000100 No password: y\nd\n' >"$PENDING"
+  printf '# 1790000000 boot: x\nc\n\n\n# 1790000100 run: y\nd\n' >"$PENDING"
   "$SCRIPT" tidy
   [ "$(cat "$PENDING")" = "$(printf '# 1790000100 run: y\nd\n\n# 1790000000 boot: x\nc')" ]
 }
 
-@test "tidy rewrites v1 jobs in this layout, dropping session and from" {
-  printf '%s\n' '#= No password' '#@ 2026-09-28T23:07:23+01:00 · 0a1b2c3d · somewhere' \
-    '#> print a cheat sheet' '~/x/show.sh' '' \
-    '# by hand 1790633300 newer' '#  a note' >"$PENDING"
-  "$SCRIPT" tidy
-  [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790633243 run: print a cheat sheet' \
-    '~/x/show.sh' '' "$SEP" '' 'newer. a note')" ]
-}
 
 @test "a job is all comments but its command: pasted into bash, only the command runs" {
-  add 1790000000 "No password" "what" "# a note" "echo ran"
+  add 1790000000 run "what" "# a note" "echo ran"
   run bash "$PENDING"
   [ "$status" -eq 0 ]
   [ "$output" = "ran" ]
 }
 
 @test "the head's epoch is the plain integer; the type ends at the first colon" {
-  add 1790000000 "No password" "2 steps: 1 of them 1790000001" "c"
+  add 1790000000 run "2 steps: 1 of them 1790000001" "c"
   [ "$(head -1 "$PENDING")" = '# 1790000000 run: 2 steps: 1 of them 1790000001' ]
   run ! grep -q '`' "$PENDING"
   run "$SCRIPT" show "2 steps: 1 of them 1790000001"
   [ "$output" = '# 1790000000 run: 2 steps: 1 of them 1790000001' ]
 }
 
-@test "tidy rewrites v2 and v3 heads in this layout" {
-  printf '%s\n' '# by hand `date -d @1790000100` newer 2' '#  a note' '' \
-    '# rig password (sudo) `date -d @1790000000` older' 'sudo c' '' \
-    '# no password 1790000050 v3' 'd' >"$PENDING"
-  "$SCRIPT" tidy
-  [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790000050 run: v3' 'd' '' \
-    '# 1790000000 sudo: older' 'sudo c' '' "$SEP" '' 'newer 2. a note')" ]
-}
 
-@test "a queue it can't read is left alone, and the place is named" {
+@test "a pending.txt it can't read is left alone, and the place is named" {
   printf '# 1790000000 boot: ok\nc\n\n# reboot: no stamp\n' >"$PENDING"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
-  run "$SCRIPT" add "Reboot" "w" "x"
+  run "$SCRIPT" add boot "w" "x"
   [ "$status" -ne 0 ]
   [[ $output == *"line 4"* ]]
   cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
-  printf '#= Reboot\n#> no stamp\n' >"$PENDING"
-  run "$SCRIPT" tidy
-  [ "$status" -ne 0 ]; [[ $output == *"line 2"* ]]
   printf 'loose text\n' >"$PENDING"
   run "$SCRIPT" tidy
   [ "$status" -ne 0 ]
@@ -194,9 +161,9 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "refuses bad input and changes nothing" {
-  add 1790000000 "Reboot" "keep" "a"
+  add 1790000000 boot "keep" "a"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
-  run "$SCRIPT" add "Reboot" "no line"
+  run "$SCRIPT" add boot "no line"
   [ "$status" -ne 0 ]; [ "$output" = "pending: usage: pending.sh add TYPE WHAT LINE..." ]
   run "$SCRIPT" add "" "w" "x"
   [ "$status" -ne 0 ]; [ "$output" = "pending: TYPE can't be empty" ]
@@ -204,13 +171,13 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
     run "$SCRIPT" add "$t" "w" "x"
     [ "$status" -ne 0 ]; [ "$output" = "pending: a TYPE is single-spaced words, none of them only digits or with a colon" ]
   done
-  run "$SCRIPT" add "Reboot" "w" ""
+  run "$SCRIPT" add boot "w" ""
   [ "$status" -ne 0 ]; [ "$output" = "pending: each LINE is one non-empty line" ]
-  run "$SCRIPT" add "Reboot" "w" "#x"
+  run "$SCRIPT" add boot "w" "#x"
   [ "$status" -ne 0 ]; [ "$output" = "pending: a LINE starting # is a note: '# text'" ]
-  run "$SCRIPT" add "Reboot" "$(printf 'two\nlines')" "x"
+  run "$SCRIPT" add boot "$(printf 'two\nlines')" "x"
   [ "$status" -ne 0 ]; [ "$output" = "pending: WHAT is one line" ]
-  run env NOW=soon "$SCRIPT" add "Reboot" "w" "x"
+  run env NOW=soon "$SCRIPT" add boot "w" "x"
   [ "$status" -ne 0 ]; [ "$output" = "pending: NOW is seconds since the epoch" ]
   run "$SCRIPT" remove
   [ "$status" -ne 0 ]; [ "$output" = "pending: usage: pending.sh remove [--prefix] WHAT" ]
@@ -252,16 +219,16 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 
 @test "add with no NOW stamps the current time" {
   before=$(date +%s)
-  "$SCRIPT" add "No password" "w" "x"
+  "$SCRIPT" add run "w" "x"
   after=$(date +%s)
   t=$(sed -En '1s/^# ([0-9]+) run: w$/\1/p' "$PENDING")
   (( t >= before && t <= after ))
 }
 
 @test "show: the head lines only, newest first, then the by-hand prose; or only the jobs saying a WHAT" {
-  add 1790000000 "No password" "old" "# a note" "cmd a"
+  add 1790000000 run "old" "# a note" "cmd a"
   add 1790000200 "Sudo" "new" "sudo b"
-  add 1790000100 "By hand" "middle" "# step"
+  add 1790000100 hand "middle" "# step"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   run "$SCRIPT" show
   [ "$status" -eq 0 ]
@@ -276,15 +243,15 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
 }
 
-@test "show WHAT succeeds when the queue's last job is another one" {
+@test "show WHAT succeeds when pending.txt's last job is another one" {
   add 1790000200 "Sudo" "wanted" "sudo b"
-  add 1790000100 "By hand" "last in the file" "# step"
+  add 1790000100 hand "last in the file" "# step"
   run "$SCRIPT" show wanted
   [ "$status" -eq 0 ]
   [ "$output" = "# 1790000200 sudo: wanted" ]
 }
 
-@test "show on a missing or empty queue prints nothing and creates nothing" {
+@test "show on a missing or empty pending.txt prints nothing and creates nothing" {
   run "$SCRIPT" show
   [ "$status" -eq 0 ]
   [ -z "$output" ]
@@ -295,7 +262,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   [ ! -e "$PENDING" ]
 }
 
-@test "show reads an out-of-order file in the queue's order, and leaves it as it is" {
+@test "show reads an out-of-order file in pending.txt's order, and leaves it as it is" {
   printf '# 1790000000 boot: x\nc\n\n# 1790000100 sudo: y\nd\n' >"$PENDING"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   run "$SCRIPT" show
@@ -311,8 +278,8 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "by-hand jobs are one paragraph below the line: run on, wrapped at 72, no prefix" {
-  add 1790000000 "No password" "free" "c"
-  add 1790000100 "By hand" "open the app and turn the setting on" "# 1. Settings > Privacy:" \
+  add 1790000000 run "free" "c"
+  add 1790000100 hand "open the app and turn the setting on" "# 1. Settings > Privacy:" \
     "# pick the second option, then Save" "# afterwards tell Claude" "~/x/done.sh item"
   text='open the app and turn the setting on. 1. Settings > Privacy: pick the second option, then Save. afterwards tell Claude. ~/x/done.sh item'
   [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790000000 run: free' 'c' '' "$SEP" '' \
@@ -340,17 +307,17 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 
 @test "by-hand prose: a word longer than 72 stands alone; blanks are single spaces" {
   long=https://example.org/$(printf '%.0s0' $(seq 70))
-  add 1790000000 "By hand" "go  to" "# $long" "# and   back."
+  add 1790000000 hand "go  to" "# $long" "# and   back."
   [ "$(cat "$PENDING")" = "$(printf '%s\n' "$SEP" '' 'go to.' "$long." 'and back.')" ]
   "$SCRIPT" has "go  to"
 }
 
 @test "below the line a new job goes on top, and the same job again stays where it is" {
-  add 1790000000 "By hand" "first" "# a"
-  add 1790000100 "By hand" "second" "# b"
-  add 1790000200 "By hand" "first" "# a"
+  add 1790000000 hand "first" "# a"
+  add 1790000100 hand "second" "# b"
+  add 1790000200 hand "first" "# a"
   [ "$(prose)" = "$(printf '%s\n' 'second. b' 'first. a')" ]
-  add 1790000300 "By hand" "third" "c"
+  add 1790000300 hand "third" "c"
   [ "$(prose)" = "$(printf '%s\n' 'third. c' 'second. b' 'first. a')" ]
 }
 
@@ -358,18 +325,13 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 @test "match: the job whose command is LINE, newest first; never a note or a by-hand job" {
   add 1790000000 sudo "older" "# cmd two" "cmd two"
   add 1790000100 sudo "newer" "cmd two"
-  add 1790000200 "by hand" "click it" "# cmd three"
+  add 1790000200 hand "click it" "# cmd three"
   run "$SCRIPT" match "cmd two"
   [ "$status" -eq 0 ]; [ "$output" = "$(printf '1790000100\tnewer')" ]
   run "$SCRIPT" match "cmd three"; [ "$status" -eq 1 ]; [ -z "$output" ]
   run "$SCRIPT" match "cmd"; [ "$status" -eq 1 ]
 }
 
-@test "match never takes a line that shows a secret" {
-  add 1790000000 "sudo + K1" "unlock" "sudo /x/secret.sh show k1" "sudo unlock-it"
-  run "$SCRIPT" match "sudo /x/secret.sh show k1"; [ "$status" -eq 1 ]
-  run "$SCRIPT" match "sudo unlock-it"; [ "$status" -eq 0 ]
-}
 
 @test "ran: a first note with the time and the result; a second run replaces it" {
   add 1790000000 sudo "do it" "# a note" "cmd one"
@@ -389,7 +351,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "run: the command runs, its output kept in the job's log, the job marked; its exit passed on" {
-  add 1790000000 "no password" "Say hello!" "echo hello; exit 3"
+  add 1790000000 run "Say hello!" "echo hello; exit 3"
   TZ=UTC NOW=1790000000 run "$SCRIPT" run "echo hello; exit 3"
   [ "$status" -eq 3 ]
   [[ $output == *hello* ]]
@@ -401,8 +363,8 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "run: a failure ends with ERROR on the terminal, not in the log; a success has none" {
-  add 1790000000 "no password" "Fail" "echo out; exit 3"
-  add 1790000100 "no password" "Pass" "echo fine"
+  add 1790000000 run "Fail" "echo out; exit 3"
+  add 1790000100 run "Pass" "echo fine"
   run --separate-stderr "$SCRIPT" run "echo out; exit 3"
   [ "$status" -eq 3 ]
   [ "$stderr" = "ERROR: Fail failed (exit 3)" ]
@@ -412,26 +374,18 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   [ -z "$stderr" ]
 }
 
-@test "the queue is ~/pending.txt, and ~/x/pending.txt on macOS, unless PENDING names one" {
+@test "pending.txt is ~/pending.txt on the rig, ~/x/pending.txt on the Mac" {
   local home=$BATS_TEST_TMPDIR/home
   mkdir -p "$home/x" "$BATS_TEST_TMPDIR/mac"
   printf '#!/bin/sh\necho Darwin\n' >"$BATS_TEST_TMPDIR/mac/uname"
   chmod +x "$BATS_TEST_TMPDIR/mac/uname"
-  HOME=$home PENDING='' "$SCRIPT" add "no password" "Here" "true"
+  HOME=$home PENDING='' "$SCRIPT" add run "Here" "true"
   grep -q "run: Here" "$home/pending.txt"
-  HOME=$home PENDING='' PATH=$BATS_TEST_TMPDIR/mac:$PATH "$SCRIPT" add "no password" "There" "true"
+  HOME=$home PENDING='' PATH=$BATS_TEST_TMPDIR/mac:$PATH "$SCRIPT" add run "There" "true"
   grep -q "run: There" "$home/x/pending.txt"
   run ! grep -q There "$home/pending.txt"
 }
 
-@test "types: the old long names are read and added as the short ones; block and message stay" {
-  printf '%s\n' "# 1790000040 no password: a" "cmd a" "" "# 1790000030 reboot: b" "cmd b" "" \
-    "# 1790000020 running: c" "cmd c" >"$PENDING"
-  add 1790000010 "Block" "d" "cmd d"
-  add 1790000000 "By hand" "e" "# in the app"
-  [ "$(sed -En 's/^# [0-9]+ ([^:]+): .*/\1/p' "$PENDING" | paste -sd' ')" = "run boot live block" ]
-  [ "$(prose)" = "e. in the app" ]
-}
 
 # A message: what a Slack message, a Jira or PR comment looks like.
 long=$(printf '%.0s word' $(seq 40))
@@ -465,11 +419,11 @@ long=$(printf '%.0s word' $(seq 40))
   [ "$("$SCRIPT" show)" = "# 1790000000 message: PR 12: a comment" ]
 }
 
-@test "message: refused empty, or holding a line the queue would read as a head or the line" {
+@test "message: refused empty, or holding a line pending.txt would read as a head or the line" {
   run "$SCRIPT" add message "m" "" "  "
   [ "$status" -ne 0 ]; [ "$output" = "pending: a message can't be empty" ]
   run "$SCRIPT" add message "m" "text" "$SEP"
-  [ "$status" -ne 0 ]; [[ $output == "pending: a message's line would end it in the queue: "* ]]
+  [ "$status" -ne 0 ]; [[ $output == "pending: a message's line would end it in pending.txt: "* ]]
   run "$SCRIPT" add message "m" "# 1790000000 run: x"
   [ "$status" -ne 0 ]
   [ ! -s "$PENDING" ]
