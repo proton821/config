@@ -223,7 +223,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
 }
 
-@test "the file is 72 wide: add refuses a longer head line, note or command" {
+@test "the file is 72 wide: add refuses a longer head line or note; a command is as long as it is" {
   w59=$(printf '%.0s=' $(seq 59))
   add 1790000000 "manual" "${w59:8}" "$(printf '%.0s=' $(seq 72))" "# $(printf '%.0s=' $(seq 69))"
   [ "$(awk 'length > 72' "$PENDING")" = "" ]
@@ -231,10 +231,15 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   run "$SCRIPT" add "manual" "${w59:7}" "c"
   [ "$status" -ne 0 ]; [ "$output" = "pending: the head line is 73 characters, over 72: shorten WHAT" ]
-  run "$SCRIPT" add "manual" "w" "$(printf '%.0s=' $(seq 73))"
-  [ "$status" -ne 0 ]; [[ $output == "pending: a LINE is 73 characters as written, over 72: "* ]]
   run "$SCRIPT" add "manual" "w" "# $(printf '%.0s=' $(seq 70))"
-  [ "$status" -ne 0 ]; [[ $output == "pending: a LINE is 73 characters as written, over 72: "* ]]
+  [ "$status" -ne 0 ]; [[ $output == "pending: a note is 73 characters as written, over 72: "* ]]
+  cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
+  long="some-command --with $(printf '%.0s--option=value ' $(seq 12))--last"
+  add 1790000100 "run" "a long command" "$long"
+  grep -qxF "$long" "$PENDING"
+  run "$SCRIPT" match "$long"
+  [ "$status" -eq 0 ]
+  "$SCRIPT" remove "a long command"
   # characters, not bytes, whatever the locale
   LC_ALL=C add 1790000000 "manual" "${w59:9}é" "c"
   cmp -s "$PENDING" "$BATS_TEST_TMPDIR/before" && false

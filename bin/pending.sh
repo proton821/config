@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# pending.sh - the one way ~/pending.txt is changed, by Claude and by timers
-# alike. The layout below is the spec (~/.claude/CLAUDE.md, "Commands I run
-# myself", says what goes in the queue and points here for how it looks;
-# why: ~/ops/scripts-first/README.md, "pending.sh"):
+# pending.sh - the one way the queue is changed, by Claude and by timers
+# alike: ~/pending.txt, or ~/x/pending.txt on macOS (PENDING names another).
+# The layout below is the spec (Claude's instructions, "Commands I run
+# myself", say what goes in the queue and point here for how it looks):
 #
 #   # <epoch> <type>: <what it does, to jog the memory>
 #   #  <a note: a password to look up, what to do if it stops>
@@ -13,10 +13,11 @@
 #   <what to do by hand, as prose that runs on from line to line, wrapped
 #   at 72 characters, with no prefix>
 #
-#   * the file is 72 characters wide: the line is 72 hyphens, an added
-#     job's head line, notes and commands fit in 72 (add refuses one that
-#     doesn't), and by-hand prose is wrapped at 72 (a word longer than that
-#     stands on a line of its own); a message's own lines are as given;
+#   * the file is 72 characters wide for what a job is: the line is 72
+#     hyphens, an added job's head line and notes fit in 72 (add refuses
+#     one that doesn't), and by-hand prose is wrapped at 72 (a word longer
+#     than that stands on a line of its own); a command, and a message's
+#     own lines, are as long as they are;
 #   * every job above the line is one head line, then any "#  " notes and
 #     command lines, in the order given; all but the commands are shell
 #     comments, so pasting a whole job runs only them;
@@ -64,8 +65,8 @@
 # "#= type", "#@ ISO time · session · from", "#> what". Lines already
 # wider than 72 are read and kept as they are.
 #
-# This script and pending.bats are the spec for pending.bin (pending.rust/):
-# change them first, then the Rust; ~/scripts/rust/rust.sh builds it.
+# Where a Rust port sits beside it (pending.rust/, pending.bin), this script
+# and pending.bats are its spec: change them first, then the Rust.
 #
 # Runs on Linux and macOS: bash 5 (Homebrew's on macOS, whose own is 3.2),
 # and GNU or BSD date, stat and chmod.
@@ -102,7 +103,7 @@
 #                                           LINE is no job's
 #
 # A job's log is for Claude to read (the user runs, Claude checks); `remove`
-# deletes it with the job. A line that prints a secret (secret.sh show) is
+# deletes it with the job. A line that prints a secret (`secret.sh show`) is
 # never run here, so its output is never kept. The input stays the terminal
 # (a password prompt reads it as before, and lines pasted after the command
 # wait for the shell); the output goes through tee, so a program sees a pipe,
@@ -391,8 +392,8 @@ message_of() {
 }
 
 # fits TYPE EPOCH WHAT BODY: dies unless a job above the line is WIDTH wide
-# at most: its head line and every line of BODY (a message's own lines are
-# as given).
+# at most: its head line and every note of BODY (a command, and a message's
+# own lines, are as long as they are).
 fits() {
   local head line
   [[ $1 != "$HAND" ]] || return 0
@@ -400,7 +401,8 @@ fits() {
   (( ${#head} <= WIDTH )) || die "the head line is ${#head} characters, over $WIDTH: shorten WHAT"
   [[ $1 != "$MESSAGE" ]] || return 0
   while IFS= read -r line; do
-    (( ${#line} <= WIDTH )) || die "a LINE is ${#line} characters as written, over $WIDTH: $line"
+    [[ $line == "#"* ]] || continue
+    (( ${#line} <= WIDTH )) || die "a note is ${#line} characters as written, over $WIDTH: $line"
   done <<<"$4"
 }
 

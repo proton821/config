@@ -63,7 +63,8 @@ is settled on the Mac. A job is known by its WHAT.
   whole, any lines, any length, so I yank it in one go). **Every command
   I type is a job above the line**, so my run of it is noted. No "(...)"
   in a type; reuse existing types exactly. **72 wide** (`pending.sh`
-  refuses longer): head line, notes and commands; detail in a note.
+  refuses longer): head line and notes; a command or a message is as long
+  as it is.
 - Exact, runnable commands, no placeholders; number a multi-step WHAT
   (1/3, 2/3, 3/3). More than a couple of steps becomes a **resumable**
   script, run in one line.

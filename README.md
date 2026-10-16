@@ -7,7 +7,8 @@ rules for Claude Code that hold on both machines (`claude-rules.md`), and
 `bin/pending.sh`, which keeps a queue of commands to run by hand
 (`~/x/pending.txt` on macOS, `~/pending.txt` elsewhere; `PENDING` names
 another; its header is the layout; bash 5, Homebrew's: `bash
-bin/pending.sh`; tests: `bats bin/pending.bats`), with its zsh hook: a
+bin/pending.sh`; tests: `bats bin/pending.bats`), with its zsh hook
+(tests: `bats bin/pending-hook.bats`): a
 queued command run exactly as written goes through `pending.sh run`, so
 its job is marked `ran ...: ok` or `failed (exit N)` as it ends, its
 output is kept in `~/.local/state/pending/`, and a failure ends with
