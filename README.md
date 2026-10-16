@@ -4,9 +4,14 @@ The look and feel of one machine, published for another (a Mac) to take:
 Neovim (LazyVim, with Neovide's settings), herdr, one colour theme for
 Neovim, Ghostty and Claude Code (herdr follows Ghostty's colours), and the
 rules for Claude Code that hold on both machines (`claude-rules.md`), and
-`bin/pending.sh`, which keeps a `pending.txt` queue of commands to run by
-hand (its header is the layout; bash 5, Homebrew's: `bash
-bin/pending.sh`; tests: `bats bin/pending.bats`).
+`bin/pending.sh`, which keeps a queue of commands to run by hand
+(`~/x/pending.txt` on macOS, `~/pending.txt` elsewhere; `PENDING` names
+another; its header is the layout; bash 5, Homebrew's: `bash
+bin/pending.sh`; tests: `bats bin/pending.bats`), with its zsh hook: a
+queued command run exactly as written goes through `pending.sh run`, so
+its job is marked `ran ...: ok` or `failed (exit N)` as it ends, its
+output is kept in `~/.local/state/pending/`, and a failure ends with
+`ERROR: ...`. Every other line runs untouched.
 
 It goes one way. Changes are made at the source and arrive here; nothing
 is edited in this repo, and `install.sh update` discards any change made in
@@ -14,12 +19,12 @@ a clone of it (edited or added files, commits), listing each first.
 
 ## On the Mac
 
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -c credential.helper= clone https://github.com/proton821/config.git ~/.local/share/config
-    bash ~/.local/share/config/install.sh
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -c credential.helper= clone https://github.com/proton821/config.git ~/x/vendor/config
+    bash ~/x/vendor/config/install.sh
 
 and, for the latest:
 
-    bash ~/.local/share/config/install.sh update
+    bash ~/x/vendor/config/install.sh update
 
 The clone and `update`'s fetch offer no credential and leave the Mac's own
 git config out, so nothing in it can send them elsewhere. `update` lists the
@@ -34,15 +39,17 @@ where that is set). Anything already there is moved aside to
 Neovim config go its plugins (`~/.local/share/nvim/lazy`). It puts one line
 in `~/.config/ghostty/config.ghostty` including `.config/ghostty/mac` (the
 theme, JetBrainsMono Nerd Font Mono at 22, the left Option key as Alt,
-and Alt+Left and Alt+Right left to herdr), Claude Code's `theme` in
+and Alt+Left and Alt+Right left to herdr); one line at the end of
+`~/.zshrc` (in `$ZDOTDIR`, if that is set) loading the queue's hook, which
+does nothing once the clone has gone; Claude Code's `theme` in
 `~/.claude/settings.json`, and one line importing `claude-rules.md` in
 `~/x/CLAUDE.md` (`~/.claude/CLAUDE.md` off macOS; `CLAUDE_MD` names
-another), leaving the rest of each file alone; `status` reports any Ghostty config whose colours, or
-included theme, win over it.
+another), leaving the rest of each file alone; `status` reports any
+Ghostty config whose colours, or included theme, win over it.
 
-Needs git, jq (macOS 15 has it), Neovide, Ghostty, herdr and
-JetBrainsMono Nerd Font; and for Neovim, Neovim 0.12 or later, ripgrep
-(its searches) and the tree-sitter CLI (Homebrew's `tree-sitter-cli`) with
+Needs git, jq (macOS 15 has it), Neovide, Ghostty, herdr,
+JetBrainsMono Nerd Font, and Homebrew's bash first on PATH for the queue;
+and for Neovim, Neovim 0.12 or later, ripgrep (its searches) and the tree-sitter CLI (Homebrew's `tree-sitter-cli`) with
 a C compiler (Xcode's Command Line Tools) to build its parsers. `install.sh
 status` says which of `nvim`, `tree-sitter` and `rg` PATH lacks.
 

@@ -52,7 +52,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   add 1790000000 "Sudo" "b" "c"
   add 1790000000 "Rig password and PIN" "c" "c"
   add 1790000000 "Other password (x.sh login)" "d" "c"
-  [ "$(sed -n '/^# /p' "$PENDING")" = "$(printf '%s\n' '# 1790000000 no password: a' '# 1790000000 sudo: b' \
+  [ "$(sed -n '/^# /p' "$PENDING")" = "$(printf '%s\n' '# 1790000000 run: a' '# 1790000000 sudo: b' \
     '# 1790000000 sudo + PIN: c' '# 1790000000 other password: d')" ]
   printf '%s\n' '# rig password (sudo) 1790000100 e' 'sudo c' '' '# rig password (sudo) `date -d @1790000000` f' 'sudo d' >"$PENDING"
   "$SCRIPT" tidy
@@ -84,12 +84,12 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   add 1790000900 "no password" "cheat sheet" "show.sh"
   add 1790000950 "No password" "cheat sheet" "# a note" "show.sh"
   [ "$(grep -c 'cheat sheet' "$PENDING")" -eq 2 ]
-  grep -qx '# 1790000000 no password: cheat sheet' "$PENDING"
+  grep -qx '# 1790000000 run: cheat sheet' "$PENDING"
   run ! grep -q '1790000900' "$PENDING"
   # an older copy found later in the file (a hand edit, a restore) wins too
-  printf '# 1790000300 reboot: w\nc\n\n# 1790000100 reboot: w\nc\n' >"$PENDING"
+  printf '# 1790000300 boot: w\nc\n\n# 1790000100 boot: w\nc\n' >"$PENDING"
   "$SCRIPT" tidy
-  [ "$(cat "$PENDING")" = "$(printf '# 1790000100 reboot: w\nc')" ]
+  [ "$(cat "$PENDING")" = "$(printf '# 1790000100 boot: w\nc')" ]
 }
 
 @test "with no NOW, a re-added job keeps its first real time" {
@@ -139,9 +139,9 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   "$SCRIPT" tidy
   cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
-  printf '# 1790000000 reboot: x\nc\n\n\n# 1790000100 No password: y\nd\n' >"$PENDING"
+  printf '# 1790000000 boot: x\nc\n\n\n# 1790000100 No password: y\nd\n' >"$PENDING"
   "$SCRIPT" tidy
-  [ "$(cat "$PENDING")" = "$(printf '# 1790000100 no password: y\nd\n\n# 1790000000 reboot: x\nc')" ]
+  [ "$(cat "$PENDING")" = "$(printf '# 1790000100 run: y\nd\n\n# 1790000000 boot: x\nc')" ]
 }
 
 @test "tidy rewrites v1 jobs in this layout, dropping session and from" {
@@ -149,7 +149,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
     '#> print a cheat sheet' '~/x/show.sh' '' \
     '# by hand 1790633300 newer' '#  a note' >"$PENDING"
   "$SCRIPT" tidy
-  [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790633243 no password: print a cheat sheet' \
+  [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790633243 run: print a cheat sheet' \
     '~/x/show.sh' '' "$SEP" '' 'newer. a note')" ]
 }
 
@@ -162,10 +162,10 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 
 @test "the head's epoch is the plain integer; the type ends at the first colon" {
   add 1790000000 "No password" "2 steps: 1 of them 1790000001" "c"
-  [ "$(head -1 "$PENDING")" = '# 1790000000 no password: 2 steps: 1 of them 1790000001' ]
+  [ "$(head -1 "$PENDING")" = '# 1790000000 run: 2 steps: 1 of them 1790000001' ]
   run ! grep -q '`' "$PENDING"
   run "$SCRIPT" show "2 steps: 1 of them 1790000001"
-  [ "$output" = '# 1790000000 no password: 2 steps: 1 of them 1790000001' ]
+  [ "$output" = '# 1790000000 run: 2 steps: 1 of them 1790000001' ]
 }
 
 @test "tidy rewrites v2 and v3 heads in this layout" {
@@ -173,12 +173,12 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
     '# rig password (sudo) `date -d @1790000000` older' 'sudo c' '' \
     '# no password 1790000050 v3' 'd' >"$PENDING"
   "$SCRIPT" tidy
-  [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790000050 no password: v3' 'd' '' \
+  [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790000050 run: v3' 'd' '' \
     '# 1790000000 sudo: older' 'sudo c' '' "$SEP" '' 'newer 2. a note')" ]
 }
 
 @test "a queue it can't read is left alone, and the place is named" {
-  printf '# 1790000000 reboot: ok\nc\n\n# reboot: no stamp\n' >"$PENDING"
+  printf '# 1790000000 boot: ok\nc\n\n# reboot: no stamp\n' >"$PENDING"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   run "$SCRIPT" add "Reboot" "w" "x"
   [ "$status" -ne 0 ]
@@ -225,21 +225,21 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 
 @test "the file is 72 wide: add refuses a longer head line, note or command" {
   w59=$(printf '%.0s=' $(seq 59))
-  add 1790000000 "Reboot" "${w59:8}" "$(printf '%.0s=' $(seq 72))" "# $(printf '%.0s=' $(seq 69))"
+  add 1790000000 "manual" "${w59:8}" "$(printf '%.0s=' $(seq 72))" "# $(printf '%.0s=' $(seq 69))"
   [ "$(awk 'length > 72' "$PENDING")" = "" ]
   [ "$(awk 'length == 72' "$PENDING" | wc -l)" -eq 3 ]
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
-  run "$SCRIPT" add "Reboot" "${w59:7}" "c"
+  run "$SCRIPT" add "manual" "${w59:7}" "c"
   [ "$status" -ne 0 ]; [ "$output" = "pending: the head line is 73 characters, over 72: shorten WHAT" ]
-  run "$SCRIPT" add "Reboot" "w" "$(printf '%.0s=' $(seq 73))"
+  run "$SCRIPT" add "manual" "w" "$(printf '%.0s=' $(seq 73))"
   [ "$status" -ne 0 ]; [[ $output == "pending: a LINE is 73 characters as written, over 72: "* ]]
-  run "$SCRIPT" add "Reboot" "w" "# $(printf '%.0s=' $(seq 70))"
+  run "$SCRIPT" add "manual" "w" "# $(printf '%.0s=' $(seq 70))"
   [ "$status" -ne 0 ]; [[ $output == "pending: a LINE is 73 characters as written, over 72: "* ]]
   # characters, not bytes, whatever the locale
-  LC_ALL=C add 1790000000 "Reboot" "${w59:9}é" "c"
+  LC_ALL=C add 1790000000 "manual" "${w59:9}é" "c"
   cmp -s "$PENDING" "$BATS_TEST_TMPDIR/before" && false
   # a line already wider is read and kept as it is
-  printf '# 1790000000 reboot: %s\nc\n' "$(printf '%.0s=' $(seq 80))" >"$PENDING"
+  printf '# 1790000000 manual: %s\nc\n' "$(printf '%.0s=' $(seq 80))" >"$PENDING"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   "$SCRIPT" tidy
   cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
@@ -249,7 +249,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   before=$(date +%s)
   "$SCRIPT" add "No password" "w" "x"
   after=$(date +%s)
-  t=$(sed -En '1s/^# ([0-9]+) no password: w$/\1/p' "$PENDING")
+  t=$(sed -En '1s/^# ([0-9]+) run: w$/\1/p' "$PENDING")
   (( t >= before && t <= after ))
 }
 
@@ -260,9 +260,9 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   run "$SCRIPT" show
   [ "$status" -eq 0 ]
-  [ "$output" = "$(printf '%s\n' '# 1790000200 sudo: new' '# 1790000000 no password: old' "$SEP" '' 'middle. step')" ]
+  [ "$output" = "$(printf '%s\n' '# 1790000200 sudo: new' '# 1790000000 run: old' "$SEP" '' 'middle. step')" ]
   run "$SCRIPT" show old new nothing
-  [ "$output" = "$(printf '%s\n' '# 1790000200 sudo: new' '# 1790000000 no password: old')" ]
+  [ "$output" = "$(printf '%s\n' '# 1790000200 sudo: new' '# 1790000000 run: old')" ]
   run "$SCRIPT" show middle
   [ "$output" = "$(printf '%s\n' "$SEP" '' 'middle. step')" ]
   run "$SCRIPT" show nothing
@@ -291,16 +291,16 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "show reads an out-of-order file in the queue's order, and leaves it as it is" {
-  printf '# 1790000000 reboot: x\nc\n\n# 1790000100 sudo: y\nd\n' >"$PENDING"
+  printf '# 1790000000 boot: x\nc\n\n# 1790000100 sudo: y\nd\n' >"$PENDING"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   run "$SCRIPT" show
   [ "${lines[0]}" = '# 1790000100 sudo: y' ]
-  [ "${lines[1]}" = '# 1790000000 reboot: x' ]
+  [ "${lines[1]}" = '# 1790000000 boot: x' ]
   cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
 }
 
 @test "show takes only head lines, never a note or command that looks like one" {
-  printf '# 1790000100 sudo: y\n# 1790000999 no password: looks like a head\n' >"$PENDING"
+  printf '# 1790000100 sudo: y\n# 1790000999 run: looks like a head\n' >"$PENDING"
   run "$SCRIPT" show
   [ "$output" = '# 1790000100 sudo: y' ]
 }
@@ -310,7 +310,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   add 1790000100 "By hand" "open the app and turn the setting on" "# 1. Settings > Privacy:" \
     "# pick the second option, then Save" "# afterwards tell Claude" "~/x/done.sh item"
   text='open the app and turn the setting on. 1. Settings > Privacy: pick the second option, then Save. afterwards tell Claude. ~/x/done.sh item'
-  [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790000000 no password: free' 'c' '' "$SEP" '' \
+  [ "$(cat "$PENDING")" = "$(printf '%s\n' '# 1790000000 run: free' 'c' '' "$SEP" '' \
     'open the app and turn the setting on. 1. Settings > Privacy: pick the' \
     'second option, then Save. afterwards tell Claude. ~/x/done.sh item')" ]
   [ "${#SEP}" -eq 72 ]
@@ -393,6 +393,84 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   grep -q hello "$log"
   [ "$(stat -c %a "$LOGS" 2>/dev/null || stat -f %Lp "$LOGS")" = 700 ]
   [ "$(sed -n 2p "$PENDING")" = "#  ran Mon 21 Sep, 2:13pm: failed (exit 3)" ]
+}
+
+@test "run: a failure ends with ERROR on the terminal, not in the log; a success has none" {
+  add 1790000000 "no password" "Fail" "echo out; exit 3"
+  add 1790000100 "no password" "Pass" "echo fine"
+  run --separate-stderr "$SCRIPT" run "echo out; exit 3"
+  [ "$status" -eq 3 ]
+  [ "$stderr" = "ERROR: Fail failed (exit 3)" ]
+  run ! grep -q ERROR "$LOGS/1790000000-fail.log"
+  run --separate-stderr "$SCRIPT" run "echo fine"
+  [ "$status" -eq 0 ]
+  [ -z "$stderr" ]
+}
+
+@test "the queue is ~/pending.txt, and ~/x/pending.txt on macOS, unless PENDING names one" {
+  local home=$BATS_TEST_TMPDIR/home
+  mkdir -p "$home/x" "$BATS_TEST_TMPDIR/mac"
+  printf '#!/bin/sh\necho Darwin\n' >"$BATS_TEST_TMPDIR/mac/uname"
+  chmod +x "$BATS_TEST_TMPDIR/mac/uname"
+  HOME=$home PENDING='' "$SCRIPT" add "no password" "Here" "true"
+  grep -q "run: Here" "$home/pending.txt"
+  HOME=$home PENDING='' PATH=$BATS_TEST_TMPDIR/mac:$PATH "$SCRIPT" add "no password" "There" "true"
+  grep -q "run: There" "$home/x/pending.txt"
+  run ! grep -q There "$home/pending.txt"
+}
+
+@test "types: the old long names are read and added as the short ones; block and message stay" {
+  printf '%s\n' "# 1790000040 no password: a" "cmd a" "" "# 1790000030 reboot: b" "cmd b" "" \
+    "# 1790000020 running: c" "cmd c" >"$PENDING"
+  add 1790000010 "Block" "d" "cmd d"
+  add 1790000000 "By hand" "e" "# in the app"
+  [ "$(sed -En 's/^# [0-9]+ ([^:]+): .*/\1/p' "$PENDING" | paste -sd' ')" = "run boot live block" ]
+  [ "$(prose)" = "e. in the app" ]
+}
+
+# A message: what a Slack message, a Jira or PR comment looks like.
+long=$(printf '%.0s word' $(seq 40))
+
+@test "message: its lines as given, of any length, blank and # lines too, and the next job read after it" {
+  add 1790000000 run "first" "cmd one"
+  add 1790000100 message "Slack #team: the release" "# Release notes" "" "Hi all,$long" "" "---" "  - indented" "#  not a note"
+  add 1790000200 sudo "last" "cmd two"
+  [ "$(cat "$PENDING")" = "$(printf '%s\n' "# 1790000200 sudo: last" "cmd two" "" \
+    "# 1790000100 message: Slack #team: the release" "# Release notes" "" "Hi all,$long" "" "---" "  - indented" "#  not a note" "" \
+    "# 1790000000 run: first" "cmd one")" ]
+  cp "$PENDING" "$BATS_TEST_TMPDIR/before"
+  "$SCRIPT" tidy
+  cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
+  [ "$("$SCRIPT" show)" = "$(printf '%s\n' "# 1790000200 sudo: last" "# 1790000100 message: Slack #team: the release" "# 1790000000 run: first")" ]
+}
+
+@test "message: from stdin with no LINEs, blank lines at its ends dropped" {
+  printf '\n\nline one\n\nline two\n\n' | NOW=1790000000 "$SCRIPT" add message "Jira ABC-1: a comment"
+  [ "$(cat "$PENDING")" = "$(printf '%s\n' "# 1790000000 message: Jira ABC-1: a comment" "line one" "" "line two")" ]
+}
+
+@test "message: never a command, never marked; show gives its head line only" {
+  add 1790000000 message "PR 12: a comment" "touch $BATS_TEST_TMPDIR/made"
+  run "$SCRIPT" match "touch $BATS_TEST_TMPDIR/made"
+  [ "$status" -eq 1 ]
+  run "$SCRIPT" run "touch $BATS_TEST_TMPDIR/made"
+  [ "$status" -eq 100 ]; [ ! -e "$BATS_TEST_TMPDIR/made" ]
+  run "$SCRIPT" ran "PR 12: a comment" 0
+  [ "$status" -ne 0 ]
+  [ "$("$SCRIPT" show)" = "# 1790000000 message: PR 12: a comment" ]
+}
+
+@test "message: refused empty, or holding a line the queue would read as a head or the line" {
+  run "$SCRIPT" add message "m" "" "  "
+  [ "$status" -ne 0 ]; [ "$output" = "pending: a message can't be empty" ]
+  run "$SCRIPT" add message "m" "text" "$SEP"
+  [ "$status" -ne 0 ]; [[ $output == "pending: a message's line would end it in the queue: "* ]]
+  run "$SCRIPT" add message "m" "# 1790000000 run: x"
+  [ "$status" -ne 0 ]
+  [ ! -s "$PENDING" ]
+  # its head line is still 72 wide at most
+  run "$SCRIPT" add message "$(printf '%.0s=' $(seq 60))" "text"
+  [ "$status" -ne 0 ]; [[ $output == "pending: the head line is "*", over 72: shorten WHAT" ]]
 }
 
 @test "run: a line that is no job's runs nothing and exits 100" {

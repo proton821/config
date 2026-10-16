@@ -5,7 +5,7 @@ if vim.fn.has("mac") == 0 then
   require("config.remote_clipboard").setup()
 end
 
-vim.opt.relativenumber = false
+vim.opt.relativenumber = true
 vim.g.autoformat = false
 
 -- Neovide: JetBrainsMono Nerd Font at 22, on every system.

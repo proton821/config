@@ -40,3 +40,42 @@ too. Published one way: they are changed at the source, not here.
   times included; quoted logs stay as they are. In scripts with GNU
   date: `LC_TIME=C date '+%-I:%M%P'`; BSD date (macOS) has no `%P`:
   `LC_TIME=C date '+%-I:%M%p' | tr '[:upper:]' '[:lower:]'`.
+
+## Commands I run myself
+
+**Anything that prompts can't run from a tool call:** logins,
+passphrases, confirmations. Assume I can't type a password unless I say
+so. Don't run or wait on these: queue them.
+
+**The queue is one file, changed only with `pending.sh`** (`add TYPE WHAT
+LINE...`, `remove [--prefix] WHAT`, `has`, `tidy`, `show [WHAT...]`; its
+header is the layout spec): `~/pending.txt` on the rig
+(`~/scripts/bin/pending.sh`), `~/x/pending.txt` on the Mac (`bash
+~/x/vendor/config/bin/pending.sh`). Never `pending.bin` until the queue
+is settled on the Mac. A job is known by its WHAT.
+
+- Only a command I can run **right now**; later steps stay in the work's
+  own README.
+- **TYPE is exactly what I do, shortest form**: "run" (a command),
+  "block" (a command your sandbox blocked), "hand" (a step in an app,
+  lines as `# ` notes, written as prose below the line), "message" (a
+  Slack message, a Jira or PR comment to post: WHAT says where; the text
+  whole, any lines, any length, so I yank it in one go). **Every command
+  I type is a job above the line**, so my run of it is noted. No "(...)"
+  in a type; reuse existing types exactly. **72 wide** (`pending.sh`
+  refuses longer): head line, notes and commands; detail in a note.
+- Exact, runnable commands, no placeholders; number a multi-step WHAT
+  (1/3, 2/3, 3/3). More than a couple of steps becomes a **resumable**
+  script, run in one line.
+- Remove another session's job only when verified done; put back one of
+  yours that's gone but not done.
+- When I say a job is done, verify read-only, then remove it. A job I ran
+  gets a first note `#  ran ...: ok` or `failed (exit N)` (the shell's
+  hook), output in `~/.local/state/pending/`: check both at session start
+  and when its topic comes up.
+- Queue the blocked step, finish the rest, say what's left.
+- **Never put a command in the reply**, nor prefix one with `!`. End with
+  "Waiting in `~/pending.txt`:" (`~/x/pending.txt` on the Mac) and a code
+  block of the head lines of the jobs **tied to that reply's topic**,
+  exactly as `pending.sh show WHAT...` prints them; no other session's or
+  topic's.

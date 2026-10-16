@@ -48,6 +48,13 @@ GHOSTTY_LINE="config-file = ?\"$REPO/$GHOSTTY_MAC\""
 GHOSTTY_CONFIG=$CONFIG_HOME/ghostty/config.ghostty
 GHOSTTY_BEFORE=$CONFIG_HOME/ghostty/config
 GHOSTTY_SUPPORT="$HOME/Library/Application Support/com.mitchellh.ghostty"
+# The queue's zsh hook is loaded by one line at the end of the Mac's
+# ~/.zshrc (in ZDOTDIR, if that is set), marked as this script's so an
+# older clone's line is replaced; it does nothing once the clone has gone.
+ZSHRC=${ZSHRC:-${ZDOTDIR:-$HOME}/.zshrc}
+ZSHRC_MARK="# the queue's hook, from config's install.sh"
+HOOK_PATH=$(printf '%s' "$REPO/bin/pending-hook.zsh" | sed "s/'/'\\\\''/g")
+ZSHRC_LINE="[[ -r '$HOOK_PATH' ]] && source '$HOOK_PATH'  $ZSHRC_MARK"
 GHOSTTY_COLOURS='background|foreground|palette|cursor-color|cursor-text|selection-background|selection-foreground'
 # What Neovim's config needs on PATH (README.md, "Needs").
 NEEDS=${NEEDS:-nvim tree-sitter rg}
@@ -161,6 +168,23 @@ rules() {
     printf '%s\n' "$RULES_LINE"; } >"$CLAUDE_MD.new"
   write_over "$CLAUDE_MD"
   ok "Claude Code's shared rules: imported in $CLAUDE_MD"
+}
+
+zshrc_ok() { [ -f "$ZSHRC" ] && grep -qxF "$ZSHRC_LINE" "$ZSHRC"; }
+
+zshrc() {
+  local line
+  if zshrc_ok; then ok "the queue's zsh hook"; return; fi
+  mkdir -p "$(dirname "$ZSHRC")"
+  # Only the hook's line changes (an older clone's goes).
+  { if [ -f "$ZSHRC" ]; then
+      while IFS= read -r line || [ -n "$line" ]; do
+        case $line in *"$ZSHRC_MARK") ;; *) printf '%s\n' "$line" ;; esac
+      done <"$ZSHRC"
+    fi
+    printf '%s\n' "$ZSHRC_LINE"; } >"$ZSHRC.new"
+  write_over "$ZSHRC"
+  ok "the queue's zsh hook: loaded by $ZSHRC (new shells)"
 }
 
 # ghostty_ok: config.ghostty includes this repo's Mac settings.
@@ -278,6 +302,7 @@ cmd_install() {
 $(links)
 EOF
   ghostty
+  zshrc
   claude
   rules
   plugins
@@ -322,6 +347,8 @@ $(links)
 EOF
   if ghostty_ok && [ -z "$(ghostty_overridden)" ]; then ok "Ghostty's settings"
   else todo "Ghostty's settings are not included, or another config overrides them (bash install.sh)"; fi
+  if zshrc_ok; then ok "the queue's zsh hook"
+  else todo "the queue's zsh hook isn't loaded by $ZSHRC (bash install.sh)"; fi
   if ! command -v jq >/dev/null 2>&1; then todo "no jq, so Claude Code's theme can't be checked"
   elif theme_ok; then ok "Claude Code's theme"
   else todo "Claude Code's theme is not set (bash install.sh)"; fi
