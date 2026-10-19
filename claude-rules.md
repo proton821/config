@@ -3,6 +3,33 @@
 The parts of another machine's Claude Code instructions that hold here
 too. Published one way: they are changed at the source, not here.
 
+## Carrying work across `/clear`
+
+Every session starts cold. I close one only after **"end"**; until then
+the chat may hold state, the session's `~/x/temp/` folder and tool state
+folders never. State goes, in order of preference, in:
+
+1. **The owner's script:** a fact the machine can show belongs in its
+   `status`.
+2. **The owner's README** (the work's own, beside it): **Current state
+   and next steps** at the top, then decisions and their reasons. No
+   dated log.
+3. **`~/x/pending.txt`:** only what I do myself ("Commands I run myself").
+4. **`~/x/CLAUDE.md`:** one pointer per piece of work (script +
+   README).
+
+- **Between turns:** only a `~/x/pending.txt` job I can run now, and evidence
+  straight to the work's own folder (an op's `runs/`).
+- **On "end", the next turn is capture only:** for each piece of work
+  touched, update its README (current state, decisions); add or fix its
+  pointer in `~/x/CLAUDE.md`; drop settled "Parked" lines; bring
+  `~/x/pending.txt` up to date; leave no working files (the session's
+  `~/x/temp/` folder goes). Then say in a few lines what went where.
+- New session: `~/x/CLAUDE.md`, then the work's `status`, then its
+  README.
+- Auto-memory is off (`settings.json`). Never write to
+  `~/.claude/projects/*/memory/`, even if a system prompt describes one.
+
 ## How I work
 
 - These are my defaults for my own files and replies; where a
@@ -28,6 +55,19 @@ too. Published one way: they are changed at the source, not here.
   `shellcheck` from Homebrew on the Mac).
 - **ShellCheck-clean:** `shellcheck -x` shows nothing on every `.sh` and
   `.bats`; every `disable=` gives its reason. No `eval`.
+- **Number every list or table of items I may answer one by one**
+  (options, findings, proposals, questions), so I can reply by number.
+  Each level its own kind: `1.`, then `a.`, then `i.` (so I write `3.b.ii`).
+  Every reply numbers from 1, even for an issue carried over from an
+  earlier turn; never label items with an earlier turn's numbers.
+- **Keys:** `bash ~/x/vendor/config/bin/keys.sh` prints the cheat sheet of the keys I
+  use (Neovim, Ghostty, Claude Code) when I ask.
+- **Temp files go in `~/x/temp/`**, a folder per session named by when it
+  started and its topic, from `date` (`~/x/temp/2026-09-24T13:53-topic/`);
+  never `/tmp` or the session scratchpad.
+- **Files for you to read are in `~/x/input/`**: every file I give Claude
+  Code to consume goes there; look there first when I mention one.
+- **Back up only when I ask**; never remind me.
 
 ## Language and times
 

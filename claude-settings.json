@@ -1,3 +1,10 @@
 {
-  "theme": "custom:omarchy"
+  "theme": "custom:blackgold",
+  "editorMode": "vim",
+  "autoMemoryEnabled": false,
+  "autoDreamEnabled": false,
+  "askUserQuestionTimeout": "never",
+  "dialogExpiry": "never",
+  "workflowKeywordTriggerEnabled": false,
+  "prefersReducedMotion": true
 }

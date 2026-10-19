@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # install.sh - put this repo's look and feel in place on the Mac: Neovim's
-# config (Neovide's settings are in it), herdr's config, Ghostty's colours,
-# Claude Code's theme and its shared rules (herdr draws in the terminal's
-# colours, so it follows Ghostty's). The repo is published one way from
+# config (Neovide's settings are in it), Ghostty's settings and colours,
+# Claude Code's theme, settings and shared rules, and ShellCheck's
+# settings. The repo is published one way from
 # another machine: nothing is edited here, and update discards any change
 # made in this copy.
 #
 # Usage (the Mac's setup clones the repo, then runs this):
 #   bash install.sh          link the configs, include Ghostty's settings,
-#                            select Claude Code's theme, import the shared
-#                            rules
+#                            set Claude Code's theme and settings,
+#                            import the shared rules
 #   bash install.sh update   fetch the published copy, list the commits and
 #                            files it brings, and reset this one to it,
 #                            listing each change, commit or added file it
@@ -21,8 +21,11 @@
 # the plugins an earlier Neovim config installed; a link into another clone
 # of this repo is replaced. The Mac's own files (Claude Code's settings and
 # CLAUDE.md, Ghostty's config) are edited in place: a link stays a link and
-# a file keeps its permissions.
+# a file keeps its permissions. A link to a file the repo no longer ships
+# (retired, below) is removed.
 # Written for macOS's own bash 3.2 and BSD tools.
+# shellcheck disable=SC2310  # linked, old_link, ours, the *_ok checks, ghostty_sets and ghostty_ours are tests: their status is the answer
+# shellcheck disable=SC2312  # every $(...) left is a message, a value a test reads (uname, readlink, ghostty_overridden: an unread one reads as no), or links, retired or include_path, which only printf
 set -euo pipefail
 
 REPO=$(cd -P -- "$(dirname -- "$0")" >/dev/null && pwd -P)
@@ -42,7 +45,7 @@ RULES_LINE=@$(printf '%s' "$REPO/claude-rules.md" | sed 's/ /\\ /g')
 # repo's Mac settings ("?": no error if the clone has gone), so they win over
 # the four; a theme in a file included later, or colours set anywhere, win
 # over them.
-GHOSTTY_THEME=omarchy
+GHOSTTY_THEME=blackgold
 GHOSTTY_MAC=.config/ghostty/mac
 GHOSTTY_LINE="config-file = ?\"$REPO/$GHOSTTY_MAC\""
 GHOSTTY_CONFIG=$CONFIG_HOME/ghostty/config.ghostty
@@ -70,8 +73,17 @@ indent() { sed 's/^/    /'; }
 # The links: where each goes, then what it points to in the repo.
 links() {
   printf '%s\t%s\n' "$CONFIG_HOME/nvim" .config/nvim
-  printf '%s\t%s\n' "$CONFIG_HOME/herdr/config.toml" .config/herdr/config.toml
   printf '%s\t%s\n' "$CONFIG_HOME/ghostty/themes/$GHOSTTY_THEME" ".config/ghostty/themes/$GHOSTTY_THEME"
+  printf '%s\t%s\n' "$HOME/.claude/themes/blackgold.json" .claude/themes/blackgold.json
+  printf '%s\t%s\n' "$CONFIG_HOME/shellcheckrc" .config/shellcheckrc
+}
+
+# Links earlier releases made, to files the repo no longer ships: herdr's
+# config (herdr is no longer used), and the themes by Omarchy's name (now
+# the theme's own).
+retired() {
+  printf '%s\t%s\n' "$CONFIG_HOME/herdr/config.toml" .config/herdr/config.toml
+  printf '%s\t%s\n' "$CONFIG_HOME/ghostty/themes/omarchy" .config/ghostty/themes/omarchy
   printf '%s\t%s\n' "$HOME/.claude/themes/omarchy.json" .claude/themes/omarchy.json
 }
 
@@ -106,6 +118,14 @@ link() {   # TARGET FROM
   ok "$target -> $src"
 }
 
+unlink_retired() {   # TARGET FROM: removed if it is still a link of a clone's
+  if linked "$1" "$2" || old_link "$1" "$2"; then
+    rm "$1"
+    rmdir "$(dirname "$1")" 2>/dev/null || true   # only if nothing else is in it
+    ok "removed $1 (no longer in this repo)"
+  fi
+}
+
 # write_over FILE: FILE.new's text into FILE, through a link and keeping its
 # permissions; then FILE.new goes.
 write_over() { cat "$1.new" >"$1"; rm -f "$1.new"; }
@@ -117,7 +137,9 @@ needs() {
   else ok "on PATH: $NEEDS"; fi
 }
 
-# theme_ok: Claude Code's settings already hold every key of the repo's.
+# theme_ok: Claude Code's settings already hold every key of the repo's
+# (its theme and the other settings shared with the source
+# machine).
 theme_ok() {
   [ -f "$CLAUDE_SETTINGS" ] || return 1
   jq -e --slurpfile want "$REPO/claude-settings.json" \
@@ -128,7 +150,7 @@ theme_ok() {
 claude() {
   local theme
   theme=$(jq -r .theme "$REPO/claude-settings.json")
-  if theme_ok; then ok "Claude Code's theme"; return; fi
+  if theme_ok; then ok "Claude Code's theme and settings"; return; fi
   mkdir -p "$(dirname "$CLAUDE_SETTINGS")"
   if [ -s "$CLAUDE_SETTINGS" ]; then
     # Only the repo's keys change; everything else in the file stays.
@@ -136,14 +158,14 @@ claude() {
            'if length == 1 and (.[0] | type) == "object" then .[0] * $want[0] else error("not one object") end' \
            "$CLAUDE_SETTINGS" >"$CLAUDE_SETTINGS.new" 2>/dev/null; then
       rm -f "$CLAUDE_SETTINGS.new"
-      todo "Claude Code's theme: $CLAUDE_SETTINGS isn't one JSON object to merge into; set \"theme\": \"$theme\" in it"
+      todo "Claude Code's settings: $CLAUDE_SETTINGS isn't one JSON object to merge into; set these in it: $(jq -c . "$REPO/claude-settings.json")"
       return
     fi
   else
     cp "$REPO/claude-settings.json" "$CLAUDE_SETTINGS.new"
   fi
   write_over "$CLAUDE_SETTINGS"
-  ok "Claude Code's theme: $theme"
+  ok "Claude Code's theme ($theme) and settings"
 }
 
 # ours LINE: LINE imports claude-rules.md from this repo or another clone of
@@ -176,6 +198,9 @@ zshrc_ok() { [ -f "$ZSHRC" ] && grep -qxF "$ZSHRC_LINE" "$ZSHRC"; }
 
 zshrc() {
   local line
+  # ShellCheck reads the first of a .shellcheckrc in the script's folder or
+  # above, ~/.shellcheckrc, then $XDG_CONFIG_HOME/shellcheckrc.
+  if [ -e "$HOME/.shellcheckrc" ]; then todo "$HOME/.shellcheckrc wins over the repo's shellcheckrc: move it aside"; fi
   if zshrc_ok; then ok "pending.txt's zsh hook"; return; fi
   mkdir -p "$(dirname "$ZSHRC")"
   # Only the hook's line changes (an older clone's goes).
@@ -255,7 +280,7 @@ ghostty() {
       fi
       printf '%s\n' "$GHOSTTY_LINE"; } >"$GHOSTTY_CONFIG.new"
     write_over "$GHOSTTY_CONFIG"
-    ok "Ghostty's settings: theme $GHOSTTY_THEME, JetBrainsMono Nerd Font Mono at 22, left Option as Alt, herdr's tab keys (reload Ghostty's config to see them)"
+    ok "Ghostty's settings, theme $GHOSTTY_THEME (reload Ghostty's config to see them)"
   fi
   over=$(ghostty_overridden)
   if [ -n "$over" ]; then
@@ -303,6 +328,9 @@ cmd_install() {
   while IFS="$(printf '\t')" read -r target from; do link "$target" "$from"; done <<EOF
 $(links)
 EOF
+  while IFS="$(printf '\t')" read -r target from; do unlink_retired "$target" "$from"; done <<EOF
+$(retired)
+EOF
   ghostty
   zshrc
   claude
@@ -347,13 +375,25 @@ cmd_status() {
   done <<EOF
 $(links)
 EOF
+  while IFS="$(printf '\t')" read -r target from; do
+    if linked "$target" "$from" || old_link "$target" "$from"; then
+      todo "$target links to a file this repo no longer ships (bash install.sh)"
+    fi
+  done <<EOF
+$(retired)
+EOF
   if ghostty_ok && [ -z "$(ghostty_overridden)" ]; then ok "Ghostty's settings"
   else todo "Ghostty's settings are not included, or another config overrides them (bash install.sh)"; fi
+  # ShellCheck reads the first of a .shellcheckrc in the script's folder or
+  # above, ~/.shellcheckrc, then $XDG_CONFIG_HOME/shellcheckrc.
+  if [ -e "$HOME/.shellcheckrc" ]; then todo "$HOME/.shellcheckrc wins over the repo's shellcheckrc: move it aside"; fi
   if zshrc_ok; then ok "pending.txt's zsh hook"
   else todo "pending.txt's zsh hook isn't loaded by $ZSHRC (bash install.sh)"; fi
-  if ! command -v jq >/dev/null 2>&1; then todo "no jq, so Claude Code's theme can't be checked"
-  elif theme_ok; then ok "Claude Code's theme"
-  else todo "Claude Code's theme is not set (bash install.sh)"; fi
+  if ! command -v jq >/dev/null 2>&1; then todo "no jq, so Claude Code's settings can't be checked"
+  else
+    if theme_ok; then ok "Claude Code's theme and settings"
+    else todo "Claude Code's theme and settings are not set (bash install.sh)"; fi
+  fi
   if rules_ok; then ok "Claude Code's shared rules"
   else todo "Claude Code's shared rules are not imported (bash install.sh)"; fi
   plugins

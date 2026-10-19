@@ -1,0 +1,3 @@
+# Resolve `source` relative to the script, so `shellcheck -x` gives the same
+# answer from any folder (tracked in scripts).
+source-path=SCRIPTDIR

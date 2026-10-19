@@ -1,9 +1,7 @@
--- LazyVim declares tokyonight and catppuccin itself. Omarchy's theme packs
--- use them on Linux; the Mac has the one theme, so there they'd be cloned and
--- never used.
-local mac = vim.fn.has("mac") == 1
-
+-- LazyVim declares tokyonight and catppuccin itself, and Omarchy's theme packs
+-- (all-themes.lua) use them; this config has the one theme (blackgold, on
+-- aether), so they would be cloned and never used. Off on every system.
 return {
-  { "folke/tokyonight.nvim", enabled = not mac },
-  { "catppuccin/nvim", name = "catppuccin", enabled = not mac },
+  { "folke/tokyonight.nvim", enabled = false },
+  { "catppuccin/nvim", name = "catppuccin", enabled = false },
 }
