@@ -225,6 +225,18 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   (( t >= before && t <= after ))
 }
 
+@test "order: numbered steps stay together in step order, however they were queued" {
+  : >"$PENDING"
+  add 1790000100 "Run" "older job" "a"
+  add 1790000300 "Run" "pack, 2/3 middle" "c"
+  add 1790000200 "Run" "pack, 1/3 first" "b"
+  add 1790000400 "Run" "pack, 3/3 last" "d"
+  add 1790000350 "Run" "other 2/2" "f"
+  add 1790000350 "Run" "other 1/2" "e"
+  add 1790000500 "Run" "newest job" "g"
+  [ "$(whats)" = "$(printf '%s\n' "newest job" "pack, 1/3 first" "pack, 2/3 middle" "pack, 3/3 last" "other 1/2" "other 2/2" "older job")" ]
+}
+
 @test "show: the head lines only, newest first, then the by-hand prose; or only the jobs saying a WHAT" {
   add 1790000000 run "old" "# a note" "cmd a"
   add 1790000200 "Sudo" "new" "sudo b"
@@ -322,6 +334,7 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 # ------------------------------------------------------- match, ran, run
+
 @test "match: the job whose command is LINE, newest first; never a note or a by-hand job" {
   add 1790000000 sudo "older" "# cmd two" "cmd two"
   add 1790000100 sudo "newer" "cmd two"
@@ -351,8 +364,8 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "run: the command runs, its output kept in the job's log, the job marked; its exit passed on" {
-  add 1790000000 run "Say hello!" "echo hello; exit 3"
-  TZ=UTC NOW=1790000000 run "$SCRIPT" run "echo hello; exit 3"
+  add 1790000000 run "Say hello!" "bash -c 'echo hello; exit 3'"
+  TZ=UTC NOW=1790000000 run "$SCRIPT" run "bash -c 'echo hello; exit 3'"
   [ "$status" -eq 3 ]
   [[ $output == *hello* ]]
   log=$LOGS/1790000000-say-hello.log
@@ -363,9 +376,9 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "run: a failure ends with ERROR on the terminal, not in the log; a success has none" {
-  add 1790000000 run "Fail" "echo out; exit 3"
+  add 1790000000 run "Fail" "bash -c 'echo out; exit 3'"
   add 1790000100 run "Pass" "echo fine"
-  run --separate-stderr "$SCRIPT" run "echo out; exit 3"
+  run --separate-stderr "$SCRIPT" run "bash -c 'echo out; exit 3'"
   [ "$status" -eq 3 ]
   [ "$stderr" = "ERROR: Fail failed (exit 3)" ]
   run ! grep -q ERROR "$LOGS/1790000000-fail.log"
@@ -452,7 +465,7 @@ long=$(printf '%.0s word' $(seq 40))
 }
 
 @test "the test data is generic: no real service, account or address" {
-  run grep -niE 'proton|google|gcp|youtube|github|gitlab|nord|bitwarden|authy|whatsapp|chromium|herdr|LINE[0-9]|@[a-z0-9-]+\.(com|me|net|co)\b' "$BATS_TEST_FILENAME"
+  run grep -niE 'proton|google|gcp|youtube|github|gitlab|nord|bitwarden|authy|whatsapp|chromium|herdr|LINE[0-9]|@[a-z0-9-]+\.(com|me|net|co)([^[:alnum:]_]|$)' "$BATS_TEST_FILENAME"
   # this test's own pattern is the one match allowed
   [ "${#lines[@]}" -eq 1 ]
 }

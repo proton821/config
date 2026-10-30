@@ -46,6 +46,19 @@ zshell() {
   [ ! -e "$T/queued" ]
 }
 
+@test "zsh: a job's command pasted with its newline (Neovim's yy) goes to pending run, and history has it without" {
+  zshell $'\e[200~'"touch $T/queued"$'\n\e[201~' "fc -ln 1 >$T/hist"
+  [ "$(cat "$T/asked")" = "run touch $T/queued" ]
+  [ ! -e "$T/queued" ]
+  [ "$(head -1 "$T/hist")" = "touch $T/queued" ]
+}
+
+@test "zsh: two lines pasted run as normal, and pending is never asked" {
+  zshell $'\e[200~'"touch $T/queued"$'\n'"touch $T/other"$'\n\e[201~'
+  [ -e "$T/queued" ] && [ -e "$T/other" ]
+  [ ! -e "$T/asked" ]
+}
+
 @test "zsh: \$? afterwards is the command's" {
   # shellcheck disable=SC2016  # expanded by zsh, not here
   RC=3 zshell "touch $T/queued" 'echo $? >'"$T/rc"

@@ -8,6 +8,11 @@ end
 vim.opt.relativenumber = true
 vim.g.autoformat = false
 
+-- No swap files, so a Neovim that didn't exit cleanly leaves no
+-- "swap file exists" warning for the next one.
+vim.opt.swapfile = false
+vim.opt.undofile = true
+
 -- Neovide: JetBrainsMono Nerd Font at Ghostty's font-size; the rig's
 -- display/sizes.sh sets both. The Mac sets its own font and size.
 if vim.g.neovide then

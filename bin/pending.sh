@@ -41,8 +41,10 @@
 #     only digits and none has a ":", so the type ends at the first ": ";
 #   * one blank line between jobs; nothing else in the file, and 0 bytes when
 #     nothing waits;
-#   * jobs newest first by their epoch (ties keep their order: numbered
-#     steps); the epoch is when the job was first queued: the same job
+#   * jobs newest first by their epoch (ties keep their order); numbered
+#     steps, a WHAT saying N/M with the same words before it, stay together
+#     in step order, at the place of the newest of them, however they were
+#     queued; the epoch is when the job was first queued: the same job
 #     twice (type, what and lines) is kept once, at its oldest time; below
 #     the line, newest first too: a new job goes on top, and the same job
 #     again stays where it is;
@@ -223,18 +225,29 @@ load() {
 }
 
 # ordered: ORDER, the indexes of J_* newest first (ties in file order), the
-# same job twice once, at its oldest time (the earlier in the file on a tie).
+# same job twice once, at its oldest time (the earlier in the file on a tie);
+# numbered steps together, in step order, where the newest of them would be.
 ordered() {
-  local i k id
-  local -a sortkeys=()
-  local -A keep=()
+  local i k id set
+  local -a sortkeys=() step=() setof=()
+  local -A keep=() set_epoch=() set_first=()
   ORDER=()
   for i in "${!J_TYPE[@]}"; do
     id=${J_TYPE[i]}$'\x1f'${J_WHAT[i]}$'\x1f'${J_BODY[i]}
     if [[ -z ${keep[$id]:-} ]] || (( J_EPOCH[i] < J_EPOCH[${keep[$id]}] )); then keep[$id]=$i; fi
   done
   for i in "${keep[@]}"; do
-    sortkeys+=("$(printf '%020d %06d' $((99999999999 - J_EPOCH[i])) "$i")")
+    set=i$i step[i]=0
+    if [[ ${J_WHAT[i]} =~ ^(.*[^0-9/])?([0-9]+)/([0-9]+)([^0-9/].*)?$ ]]; then
+      set=s${BASH_REMATCH[1]}/${BASH_REMATCH[3]} step[i]=$((10#${BASH_REMATCH[2]}))
+    fi
+    setof[i]=$set
+    if [[ -z ${set_epoch[$set]:-} ]] || (( J_EPOCH[i] > set_epoch[$set] )); then set_epoch[$set]=${J_EPOCH[i]}; fi
+    if [[ -z ${set_first[$set]:-} ]] || (( i < set_first[$set] )); then set_first[$set]=$i; fi
+  done
+  for i in "${keep[@]}"; do
+    set=${setof[i]}
+    sortkeys+=("$(printf '%020d %06d %06d %06d' $((99999999999 - set_epoch[$set])) "${set_first[$set]}" "${step[i]}" "$i")")
   done
   (( ${#sortkeys[@]} )) || return 0
   while IFS= read -r k; do ORDER+=($((10#${k##* }))); done < <(printf '%s\n' "${sortkeys[@]}" | LC_ALL=C sort)
@@ -316,6 +329,7 @@ body_of() {
   done
   printf '%s' "$out"
 }
+
 
 # message_of LINE...: a message's text: the LINEs as given (stdin's text
 # with none), without blank lines at either end; dies on an empty one, or

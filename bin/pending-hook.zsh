@@ -5,12 +5,13 @@
 # "ERROR: ...". Every other line runs as normal, untouched.
 #
 # How: zsh can't skip a command from preexec, so a line-finish widget hook
-# (Enter) looks at the whole line: only when it is one line, in
-# pending.txt, and `pending.sh match` calls it a job's command does it turn
-# the line into `pending-run 'LINE'`, which shows on screen as it runs.
-# History keeps the line as typed (zshaddhistory), and $? afterwards is the
-# command's. Only a job's command line is copied, never its notes, so a
-# line of several is never a job's.
+# (Enter) looks at the whole line, less one trailing newline (a line copied
+# whole, as Neovim's yy does, and pasted brings it): only when it is one
+# line, in pending.txt, and `pending.sh match` calls it a job's command does
+# it turn the line into `pending-run 'LINE'`, which shows on screen as it
+# runs. History keeps the line as typed (zshaddhistory), and $? afterwards
+# is the command's. Only a job's command line is copied, never its notes, so
+# a line of several is never a job's.
 #
 # pending.sh runs through the bash on PATH (Homebrew's on the Mac), since
 # the Mac's clone keeps no x bit. Not for scripts: only interactive shells,
@@ -35,7 +36,7 @@ fi
 # __pending_finish: the line-finish hook; turns a job's command line
 # into a pending-run of it.
 __pending_finish() {
-  local line=$BUFFER
+  local line=${BUFFER%$'\n'}
   [[ -n $line && $line != *$'\n'* ]] || return 0
   command grep -Fqx -- "$line" "$__pending_file" 2>/dev/null || return 0
   command env PENDING="$__pending_file" bash -- "$__pending_cmd" match "$line" \

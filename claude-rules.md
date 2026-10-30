@@ -55,11 +55,18 @@ folders never. State goes, in order of preference, in:
   `shellcheck` from Homebrew on the Mac).
 - **ShellCheck-clean:** `shellcheck -x` shows nothing on every `.sh` and
   `.bats`; every `disable=` gives its reason. No `eval`.
+- **POSIX regex:** `sed` and `grep` patterns are POSIX, as macOS's BSD
+  tools read them: `[[:space:]]`, not `\s` (nor `\S`, `\w`, `\b`, `\<`);
+  `-E` for `|`, `+` and `?`; never `grep -P`. An exception ends its line
+  with `# not-posix: REASON`.
 - **Number every list or table of items I may answer one by one**
   (options, findings, proposals, questions), so I can reply by number.
   Each level its own kind: `1.`, then `a.`, then `i.` (so I write `3.b.ii`).
-  Every reply numbers from 1, even for an issue carried over from an
-  earlier turn; never label items with an earlier turn's numbers.
+  **No number or letter is used twice in one session**: every list,
+  in every reply, carries on from the last one (a reply ends at 16, the
+  next starts at 17; sub-items likewise, the next after `d.` is `e.`).
+  Headings carry no numbers; an earlier item is named in prose ("your
+  point on the PDFs"), never relabelled with its old number.
 - **Keys:** `bash ~/x/vendor/config/bin/keys.sh` prints the cheat sheet of the keys I
   use (Neovim, Ghostty, Claude Code) when I ask.
 - **Temp files go in `~/x/temp/`**, a folder per session named by when it
@@ -112,7 +119,9 @@ TYPE WHAT LINE...`, `remove [--prefix] WHAT`, `has`, `tidy`, `show
   hook), output in `~/.local/state/pending/`: check both at session start
   and when its topic comes up.
 - Put the blocked step in pending.txt, finish the rest, say what's left.
-- **Never put a command in the reply**, nor prefix one with `!`. End with
-  "Waiting in `~/x/pending.txt`:" and a code block of the head lines of the jobs **tied to that reply's topic**,
-  exactly as `pending.sh show WHAT...` prints them; no other session's or
-  topic's.
+- **Never put a command in the reply**, nor prefix one with `!`. A reply
+  whose turn added jobs to pending.txt ends with "Waiting in
+  `~/x/pending.txt`:" and a code block of those jobs' head lines only,
+  exactly as `pending.sh show WHAT...` prints them; never jobs already
+  there (another session's or an earlier turn's). No job added, no
+  section.

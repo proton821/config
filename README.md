@@ -27,7 +27,8 @@ and, for the latest:
 
     bash ~/x/vendor/config/install.sh update
 
-The clone and `update`'s fetch offer no credential and leave the Mac's own
+The repo is public only while a release is out, so the clone and `update`
+work then and not between releases. They offer no credential and leave the Mac's own
 git config out, so nothing in it can send them elsewhere. `update` lists the
 commits and files it takes (`git log --stat`) before it resets to them.
 
