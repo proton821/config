@@ -122,6 +122,16 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
   [ ! -s "$PENDING" ]
 }
 
+@test "remove: a log it can't delete doesn't stop the job going" {
+  add 1790000000 run "stuck" "cmd"
+  mkdir -p "$LOGS"; : >"$LOGS/1790000000-stuck.log"; chmod 500 "$LOGS"
+  run "$SCRIPT" remove "stuck"
+  chmod 700 "$LOGS"
+  [ "$status" -eq 0 ]; [ -z "$output" ]
+  [ ! -s "$PENDING" ]
+  [ -f "$LOGS/1790000000-stuck.log" ]
+}
+
 @test "remove and tidy on a missing pending.txt create nothing" {
   rm "$PENDING"
   "$SCRIPT" remove s
@@ -352,8 +362,9 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 }
 
 @test "a WHAT is only text, in a chain's name too" {
-  add 1790000000 run "\$(touch $BATS_TEST_TMPDIR/made) 1/2 x" "cmd a"
-  add 1790000000 run "\$(touch $BATS_TEST_TMPDIR/made) 2/2 y" "cmd b"
+  cd "$BATS_TEST_TMPDIR"
+  add 1790000000 run "\$(touch made) 1/2 x" "cmd a"
+  add 1790000000 run "\$(touch made) 2/2 y" "cmd b"
   "$SCRIPT" tidy
   [ ! -e "$BATS_TEST_TMPDIR/made" ]
   [ "$(grep -c '^# ' "$PENDING")" -eq 2 ]
@@ -671,20 +682,42 @@ prose() { awk '/^-+$/ { below = 1; next } !below { next } /^$/ { if (p != "") pr
 # aged LOG: LOG's time, long ago.
 aged() { touch -t 202001010000 "$1"; }
 
-@test "a job stays until it is removed or cut: ok, failed or never run, however old" {
-  add 1790000000 run "did it" "true"
+@test "a job stays until it is removed or cut: failed, never run, or a step of a chain still open, however old" {
   add 1790000001 run "broke" "false"
   add 1790000002 run "not yet" "echo nope"
   add 1790000003 run "pack 2/2 last" "printf x"
   add 1790000003 run "pack 1/2 first" "echo first"
-  "$SCRIPT" run true
   run "$SCRIPT" run false
   "$SCRIPT" run "printf x"
-  aged "$LOGS/1790000000-did-it.log"; aged "$LOGS/1790000001-broke.log"; aged "$LOGS/1790000003-pack-2-2-last.log"
+  aged "$LOGS/1790000001-broke.log"; aged "$LOGS/1790000003-pack-2-2-last.log"
   cp "$PENDING" "$BATS_TEST_TMPDIR/before"
   NOW=2000000000 "$SCRIPT" tidy
   cmp "$PENDING" "$BATS_TEST_TMPDIR/before"
-  [ -f "$LOGS/1790000000-did-it.log" ]
+}
+
+@test "a job that ran ok goes after a day, its log left for result; a whole chain goes together" {
+  local now
+  now=$(date +%s)
+  add "$now" run "did it" "true"
+  add "$now" run "pack 1/2 first" "echo first"
+  add "$now" run "pack 2/2 last" "printf x"
+  "$SCRIPT" run true
+  "$SCRIPT" run "echo first" >/dev/null
+  "$SCRIPT" run "printf x" >/dev/null
+  NOW=$((now + 86400 - 60)) "$SCRIPT" tidy
+  "$SCRIPT" has "did it"
+  NOW=$((now + 86400 + 60)) "$SCRIPT" tidy
+  [ ! -s "$PENDING" ]
+  run "$SCRIPT" result "did it"
+  [ "$status" -eq 0 ]
+  [[ ${lines[0]} == "gone from pending.txt, ran "*": ok" ]]
+}
+
+@test "a job marked ok with no log stays: nothing says when it ran" {
+  add 1790000000 run "marked" "c"
+  "$SCRIPT" ran "marked" 0
+  NOW=2000000000 "$SCRIPT" tidy
+  "$SCRIPT" has "marked"
 }
 
 
@@ -821,10 +854,11 @@ aged() { touch -t 202001010000 "$1"; }
 
 @test "pending.txt is ~/pending.txt on the rig, ~/x/pending.txt on the Mac" {
   local home=$BATS_TEST_TMPDIR/home
-  mkdir -p "$home/x" "$BATS_TEST_TMPDIR/mac"
+  mkdir -p "$home/x" "$BATS_TEST_TMPDIR/mac" "$BATS_TEST_TMPDIR/linux"
   printf '#!/bin/sh\necho Darwin\n' >"$BATS_TEST_TMPDIR/mac/uname"
-  chmod +x "$BATS_TEST_TMPDIR/mac/uname"
-  HOME=$home PENDING='' "$SCRIPT" add run "Here" "true"
+  printf '#!/bin/sh\necho Linux\n' >"$BATS_TEST_TMPDIR/linux/uname"
+  chmod +x "$BATS_TEST_TMPDIR/mac/uname" "$BATS_TEST_TMPDIR/linux/uname"
+  HOME=$home PENDING='' PATH=$BATS_TEST_TMPDIR/linux:$PATH "$SCRIPT" add run "Here" "true"
   grep -q "run: Here" "$home/pending.txt"
   HOME=$home PENDING='' PATH=$BATS_TEST_TMPDIR/mac:$PATH "$SCRIPT" add run "There" "true"
   grep -q "run: There" "$home/x/pending.txt"

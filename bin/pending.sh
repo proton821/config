@@ -83,10 +83,13 @@
 #   * a job gone by hand is simply gone: `run` still ends as its command
 #     did, and its log goes as the logs below do.
 #
-# A job stays until it is removed or cut: one that ran keeps its mark, ok or
-# failed, and one never run waits (status names what failed and, after 7 days,
-# what never ran). Only these go by themselves, at any change (and each new
-# shell tidies, from the hook):
+# A job stays until it is removed or cut: one that failed keeps its mark, and
+# one never run waits (status names what failed and, after 7 days, what never
+# ran). Only these go by themselves, at any change (and each new shell tidies,
+# from the hook):
+#   * a job that ran ok, its log untouched for a day, unless a step of its
+#     chain hasn't: the session that owned it has had its chance to look, and
+#     `result` answers from the log for up to 14 days after it ran;
 #   * a log with no job, and orphans.txt, after 14 days untouched.
 #
 #
@@ -167,6 +170,7 @@ ORPHANS=$LOGS/orphans.txt
 NOT_A_JOB=100
 LOCK_STALE=30
 STALE_DAYS=7
+OK_DAYS=1
 KEEP_DAYS=14
 # run's command: LINE ($1) in bash, its output both on screen and added to the
 # log ($2), then ($4...) `ended`, as this script's own command; the shell stays
@@ -353,7 +357,7 @@ step_of() {
 ordered() {
   local i k id set c found sorted chains=0
   local -a keys=() steps=() chain=() step=()
-  local -A keep=() set_epoch=() set_first=() name=() have=() of=()
+  local -A keep=() set_epoch=() set_first=() chain_name=() have=() of=()
   ORDER=()
   for i in "${!J_TYPE[@]}"; do
     unmarked "${J_BODY[i]}"
@@ -363,7 +367,7 @@ ordered() {
   for i in "${keep[@]}"; do
     chain[i]=i$i step[i]=0
     if step_of "${J_WHAT[i]}"; then
-      step[i]=$S_N name[$i]=$S_NAME/$S_M
+      step[i]=$S_N chain_name[$i]=$S_NAME/$S_M
       printf -v k '%018d %06d' "${J_EPOCH[i]}" "$i"
       steps+=("$k")
     fi
@@ -374,12 +378,12 @@ ordered() {
     sorted=$(printf '%s\n' "${steps[@]}" | LC_ALL=C sort)
     while IFS= read -r k; do
       i=$((10#${k##* })) found=""
-      for c in ${of[${name[$i]}]:-}; do
+      for c in ${of[${chain_name[$i]}]:-}; do
         if [[ -z ${have[$c.${step[i]}]:-} ]]; then found=$c; break; fi
       done
       if [[ -z $found ]]; then
         found=$chains chains=$((chains + 1))
-        of[${name[$i]}]="$found ${of[${name[$i]}]:-}"
+        of[${chain_name[$i]}]="$found ${of[${chain_name[$i]}]:-}"
       fi
       have[$found.${step[i]}]=1
       chain[i]=c$found
@@ -499,11 +503,33 @@ sweep() {
   done <<<"$old"
 }
 
+# retire: J_* without the jobs that ran ok OK_DAYS ago or more, by their log's
+# time (the mark has no year); one with no log, or a step of a chain with a
+# step not ok, stays.
+retire() {
+  local i first at
+  local -a kept=()
+  local -A open=()
+  for i in "${!J_TYPE[@]}"; do
+    first=${J_BODY[i]%%$'\n'*}
+    if ! [[ $first =~ $OK_RE ]] && step_of "${J_WHAT[i]}"; then open[$S_NAME/$S_M]=1; fi
+  done
+  for i in "${!J_TYPE[@]}"; do
+    first=${J_BODY[i]%%$'\n'*}
+    if [[ $first =~ $OK_RE ]] && at=$(mtime "$(log_of "$i")") && (( (NOW - at) / 86400 >= OK_DAYS )); then
+      if ! step_of "${J_WHAT[i]}" || [[ -z ${open[$S_NAME/$S_M]:-} ]]; then continue; fi
+    fi
+    kept+=("$i")
+  done
+  only "${kept[@]}"
+}
+
 # save: what has gone taken out, then the queue rendered into a temp file beside
 # pending.txt (one name: only the lock's holder writes it), which replaces
 # it (only if it differs).
 save() {
   local tmp=$PENDING.new mode
+  retire
   move_loose
   [[ -e $PENDING ]] || : >"$PENDING"
   render >"$tmp" || { rm -f "$tmp"; return 1; }
@@ -665,7 +691,7 @@ cmd_remove() {
   for i in "${!J_TYPE[@]}"; do
     if says "$PREFIX" "$WHAT" "$i"; then
       log=$(log_of "$i")
-      rm -f -- "$log"
+      rm -f -- "$log" 2>/dev/null || true
     else
       kept+=("$i")
     fi

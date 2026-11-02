@@ -29,7 +29,8 @@ EOF
 
 # pty CMD: the shell line CMD in a pseudo-terminal, stdin typed into it;
 # util-linux's script takes it with -c, BSD's (macOS) as the command after
-# the file.
+# the file. BSD's sends ^D at stdin's end, and zsh exits on it before running
+# what was typed: its callers hold stdin open for a moment after the exit.
 pty() {
   if script --version >/dev/null 2>&1; then script -qec "$1" /dev/null
   else script -q /dev/null /bin/sh -c "$1"; fi
@@ -40,7 +41,7 @@ pty() {
 zshell() {
   mkdir -p "$T/zdot"
   printf '%s\n' "source $T/bin/pending-hook.zsh" "PS1='$ '" >"$T/zdot/.zshrc"
-  printf '%s\n' "$@" exit | ZDOTDIR=$T/zdot pty "zsh -i" >/dev/null
+  { printf '%s\n' "$@" exit; sleep 2; } | ZDOTDIR=$T/zdot pty "zsh -i" >/dev/null
 }
 
 @test "zsh: a job's command goes to pending run, and zsh does not run it again" {
@@ -126,7 +127,7 @@ zshell() {
   [ -e "$T/queued" ] && [ -e "$T/after" ]
   [ -f "$T/logs/1790000000-queued.log" ]
   grep -q '^#  ran .*: ok$' "$PENDING"
-  printf '%s\n' false true exit | ZDOTDIR=$T/zdot pty "zsh -i" >"$T/out"
+  { printf '%s\n' false true exit; sleep 2; } | ZDOTDIR=$T/zdot pty "zsh -i" >"$T/out"
   grep -q 'ERROR: fails failed (exit 1)' "$T/out"
   grep -q '^#  ran .*: failed (exit 1)$' "$PENDING"
 }
@@ -141,7 +142,7 @@ zshell() {
   mkdir -p "$T/zdot" "$T/h/x"
   cp "$PENDING" "$T/h/x/pending.txt"
   printf '%s\n' "OSTYPE=darwin23" "source $T/bin/pending-hook.zsh" >"$T/zdot/.zshrc"
-  printf '%s\n' "touch $T/queued" exit |
+  { printf '%s\n' "touch $T/queued" exit; sleep 2; } |
     HOME=$T/h PENDING='' ZDOTDIR=$T/zdot pty "zsh -i" >/dev/null
   [ "$(cat "$T/asked")" = "run touch $T/queued" ]
 }

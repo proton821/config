@@ -120,7 +120,7 @@ is known by its WHAT.
 - When I say a job is done, verify read-only, then remove it. A job I ran
   gets a first note `#  ran ...: ok` or `failed (exit N)` (the shell's
   hook), output in `~/.local/state/pending/`: check both at session start
-  and when its topic comes up.
+  and when its topic comes up. An ok job left a day goes by itself.
 - Put the blocked step in pending.txt, finish the rest, say what's left.
 - **Never put a command in the reply**, nor prefix one with `!`. A reply
   whose turn added jobs to pending.txt ends with "Waiting in
