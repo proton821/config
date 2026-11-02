@@ -5,13 +5,17 @@
 # "ERROR: ...". Every other line runs as normal, untouched.
 #
 # How: zsh can't skip a command from preexec, so a line-finish widget hook
-# (Enter) looks at the whole line, less one trailing newline (a line copied
-# whole, as Neovim's yy does, and pasted brings it): only when it is one
-# line, in pending.txt, and `pending.sh match` calls it a job's command does
+# (Enter) looks at the whole line, less the blanks at its ends and a trailing
+# newline (a line copied whole, as Neovim's yy does, and pasted brings it),
+# and less any "#" lines, so a job pasted whole is its one command (zsh would
+# try to run its "#" lines, without interactivecomments): only when one line
+# is left, in pending.txt, and `pending.sh match` calls it a job's command does
 # it turn the line into `pending-run 'LINE'`, which shows on screen as it
 # runs. History keeps the line as typed (zshaddhistory), and $? afterwards
-# is the command's. Only a job's command line is copied, never its notes, so
-# a line of several is never a job's.
+# is the command's. Two commands pasted together are never a job's.
+#
+# Each new shell runs `pending.sh tidy` in the background, so lines a hand cut
+# left with no job go with no one asking.
 #
 # pending.sh runs through the bash on PATH (Homebrew's on the Mac), since
 # the Mac's clone keeps no x bit. Not for scripts: only interactive shells,
@@ -36,31 +40,39 @@ fi
 # __pending_finish: the line-finish hook; turns a job's command line
 # into a pending-run of it.
 __pending_finish() {
-  local line=${BUFFER%$'\n'}
-  [[ -n $line && $line != *$'\n'* ]] || return 0
+  local l line= kept=0
+  [[ -n $BUFFER ]] || return 0
+  for l in "${(@f)BUFFER}"; do
+    while [[ $l == [[:space:]]* ]]; do l=${l#?}; done
+    while [[ $l == *[[:space:]] ]]; do l=${l%?}; done
+    [[ -n $l && $l != \#* ]] || continue
+    line=$l
+    kept=$((kept + 1))
+  done
+  (( kept == 1 )) || return 0
   command grep -Fqx -- "$line" "$__pending_file" 2>/dev/null || return 0
   command env PENDING="$__pending_file" bash -- "$__pending_cmd" match "$line" \
     >/dev/null 2>&1 || return 0
-  __pending_line=$line
+  __pending_line=$BUFFER
   BUFFER="pending-run ${(q-)line}"
 }
 
 # zshaddhistory: the line as typed goes into history, not its pending-run.
 __pending_history() {
   [[ -n $__pending_line && ${1%$'\n'} == "pending-run "* ]] || return 0
-  print -s -- "$__pending_line"
+  print -s -- "${__pending_line%$'\n'}"
   __pending_line=
   return 1
 }
 
 # pending-run LINE: LINE through `pending.sh run`; returns as LINE did. A
-# line no longer in pending.txt (removed in between) runs nothing: run it
-# again.
+# line no longer in pending.txt (removed in between), or whose log can't be
+# kept, runs nothing: run it again.
 pending-run() {
   local rc=0
   PENDING=$__pending_file command bash -- "$__pending_cmd" run "$1" || rc=$?
   if (( rc == 100 )); then
-    print -u2 -- "pending: no longer in pending.txt, nothing ran; run it again"
+    print -u2 -- "pending: no longer in pending.txt or no log kept, nothing ran; run it again"
   fi
   return $rc
 }
@@ -71,3 +83,4 @@ zmodload zsh/zle || return 0
 autoload -Uz add-zle-hook-widget add-zsh-hook
 add-zle-hook-widget line-finish __pending_finish
 add-zsh-hook zshaddhistory __pending_history
+( PENDING=$__pending_file command bash -- "$__pending_cmd" tidy </dev/null >/dev/null 2>&1 &! )

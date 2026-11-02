@@ -8,6 +8,7 @@ term = xterm-256color
 window-padding-x = 14
 window-padding-y = 14
 confirm-close-surface = false
+window-new-tab-position = end
 resize-overlay = never
 cursor-style = "block"
 cursor-style-blink = false

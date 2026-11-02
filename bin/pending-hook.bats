@@ -5,6 +5,7 @@
 # what it is asked to run. zsh is macOS's own, or the zsh package.
 # No root, no network; the real pending.txt and history are never touched.
 # shellcheck disable=SC2030,SC2031  # each @test is its own subshell, so exports never cross tests
+# shellcheck disable=SC2312  # the test idiom: a $(...) inside a [ ... ] that compares what it printed
 bats_require_minimum_version 1.5.0
 
 setup() {
@@ -12,10 +13,12 @@ setup() {
   mkdir -p "$T/bin"
   cp "$BATS_TEST_DIRNAME/pending-hook.zsh" "$T/bin/"
   # the stand-in: logs "run LINE"; runs nothing; RC (default 0) is its exit;
-  # `match` logs nothing and exits MATCH_RC (default 0: a job's command)
+  # `match` logs nothing and exits MATCH_RC (default 0: a job's command);
+  # `tidy`, each new shell's, leaves a file and logs nothing else
   cat >"$T/bin/pending.sh" <<'EOF'
 #!/usr/bin/env bash
 [[ $1 == match ]] && exit "${MATCH_RC:-0}"
+[[ $1 == tidy ]] && { : >"$T/tidied"; exit 0; }
 printf '%s\n' "$*" >>"$T/asked"
 exit "${RC:-0}"
 EOF
@@ -57,6 +60,24 @@ zshell() {
   zshell $'\e[200~'"touch $T/queued"$'\n'"touch $T/other"$'\n\e[201~'
   [ -e "$T/queued" ] && [ -e "$T/other" ]
   [ ! -e "$T/asked" ]
+}
+
+@test "zsh: a job pasted whole, its # lines and its one command, goes to pending run" {
+  zshell $'\e[200~'"# 1790000000 run: queued"$'\n'"#  a note"$'\n'"touch $T/queued"$'\n\e[201~'
+  [ "$(cat "$T/asked")" = "run touch $T/queued" ]
+  [ ! -e "$T/queued" ]
+}
+
+@test "zsh: blanks around a job's command don't hide it" {
+  zshell "  touch $T/queued  "
+  [ "$(cat "$T/asked")" = "run touch $T/queued" ]
+  [ ! -e "$T/queued" ]
+}
+
+@test "zsh: each new shell tidies pending.txt, in the background" {
+  zshell "true"
+  for _ in 1 2 3 4 5 6 7 8 9 10; do [ ! -e "$T/tidied" ] || break; sleep 0.1; done
+  [ -e "$T/tidied" ]
 }
 
 @test "zsh: \$? afterwards is the command's" {

@@ -11,7 +11,9 @@ its zsh hook (tests: `bats bin/pending-hook.bats`): a command from
 pending.txt run exactly as written goes through `pending.sh run`, so its
 job is marked `ran ...: ok` or `failed (exit N)` as it ends, its
 output is kept in `~/.local/state/pending/`, and a failure ends with
-`ERROR: ...`. Every other line runs untouched. `bin/keys.sh` prints the
+`ERROR: ...`. Every other line runs untouched. The file can be cut by hand
+at any time (`ggdG`, `d4<CR>`): nothing breaks, and what a cut leaves with no
+job moves to `orphans.txt` beside the logs. `bin/keys.sh` prints the
 cheat sheet of the keys used on both machines (tests: `bats bin/keys.bats`).
 
 It goes one way. Changes are made at the source and arrive here; nothing
@@ -54,6 +56,28 @@ Ghostty config whose colours, or included theme, win over it.
 
 Only what both machines share is here. The Mac's own settings (font
 sizes, notifications, how its apps start) are its own, set on it.
+
+## The same apps on the same desktops
+
+Desktop numbers mean the same on both machines. No setting carries across
+window managers, so on the Mac this table is set by hand, once, each machine
+using its own app for each:
+
+| Desktop | What |
+|---------|------|
+| 1 | terminal |
+| 2 | editor |
+| 3 | browser |
+| 4 | chat |
+| 5 | media |
+| 6 | music |
+
+In System Settings, Desktop & Dock, Mission Control, turn off "Automatically
+rearrange Spaces based on most recent use", so the numbers stay put, and make
+six desktops. Then go to each desktop in turn, open its app, right-click its
+Dock icon, and choose Options, Assign To, This Desktop. Every one of these apps
+starts at login: add them to System Settings, General, Login Items. Finder stays on All
+Desktops or None, as you like.
 
 Needs git, jq (macOS 15 has it), Neovide, Ghostty, JetBrainsMono Nerd Font, and Homebrew's bash first on PATH for pending.sh;
 and for Neovim, Neovim 0.12 or later, ripgrep (its searches) and the tree-sitter CLI (Homebrew's `tree-sitter-cli`) with

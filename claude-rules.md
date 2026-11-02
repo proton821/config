@@ -96,7 +96,8 @@ so. Don't run or wait on these: put them in pending.txt.
 
 **`~/x/pending.txt` is changed only with `bash ~/x/vendor/config/bin/pending.sh`** (`add
 TYPE WHAT LINE...`, `remove [--prefix] WHAT`, `has`, `tidy`, `show
-[WHAT...]`; its header is the layout spec). A job is known by its WHAT.
+[WHAT...]`, `result WHAT`, `status`; its header is the layout spec). A job
+is known by its WHAT.
 
 - Only a command I can run **right now**; later steps stay in the work's
   own README.
@@ -109,11 +110,13 @@ TYPE WHAT LINE...`, `remove [--prefix] WHAT`, `has`, `tidy`, `show
   in a type; reuse existing types exactly. **72 wide** (`pending.sh`
   refuses longer): head line and notes; a command or a message is as long
   as it is.
-- Exact, runnable commands, no placeholders; number a multi-step WHAT
-  (1/3, 2/3, 3/3). More than a couple of steps becomes a **resumable**
-  script, run in one line.
-- Remove another session's job only when verified done; put back one of
-  yours that's gone but not done.
+- Exact, runnable commands, no placeholders; a multi-step WHAT is a chain:
+  `NAME N/M what it does`, the same NAME in every step (`root tools 1/2:
+  read the diff`; `add` refuses a step with no NAME). More than a couple of
+  steps becomes a **resumable** script, run in one line.
+- Remove another session's job only when verified done. A job of yours
+  that's gone, I cut (`pending.sh result WHAT` says whether it ran): never
+  put it back unasked.
 - When I say a job is done, verify read-only, then remove it. A job I ran
   gets a first note `#  ran ...: ok` or `failed (exit N)` (the shell's
   hook), output in `~/.local/state/pending/`: check both at session start
